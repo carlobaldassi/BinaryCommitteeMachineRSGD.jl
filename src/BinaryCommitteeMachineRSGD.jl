@@ -39,11 +39,11 @@ end
 type Params
     N::Int64
     K::Int64
-    R::Int64
+    y::Int64
     τ::Int64
     η::Float64
+    λ::Float64
     γ::Float64
-    β::Float64
 end
 
 type Grads
@@ -88,14 +88,14 @@ function reset_grads!(net::Net, params::Params)
 end
 
 function reset_net_mean!(netc::Net, nets::Vector{Net}, params::Params)
-    @extract params : N K R
+    @extract params : N K y
     W = Weights(N, K)
     Δ = Grads(N, K)
 
     for k = 1:K
         W.H[k] = zeros(Float64, N)
-	for r = 1:R
-	    add_cx_to_y!(1/R, 2. * nets[r].W.J[k] - 1, W.H[k])
+	for r = 1:y
+	    add_cx_to_y!(1/y, 2. * nets[r].W.J[k] - 1, W.H[k])
 	end
 	W.J[k] = W.H[k] .> 0
     end
@@ -191,7 +191,7 @@ let wrongh = Int[], indh = Int[], sortedindh = Int[]
 end
 
 function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
-    @extract params : γ
+    @extract params : λ
     @extract net    : N K W
     @extract netc   : Wc=W
     @extract W      : H J
@@ -205,8 +205,8 @@ function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
 	end
 	Hk = H[k]
 	Hck = Hc[k]
-	add_cx_to_y!(γ, δH, Hk)
-	add_cx_to_y!(-γ, δH, Hck)
+	add_cx_to_y!(λ, δH, Hk)
+	add_cx_to_y!(-λ, δH, Hck)
 	for i = 1:N
 	    #Jk[i] = Hk[i] > 0
 	    #Jck[i] = Hck[i] > 0
@@ -217,41 +217,41 @@ function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
 end
 
 function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2, cavity::Bool = false, ep = 0.0)
-    @extract params : N K R β γ
+    @extract params : N K y γ λ
     @extract net    : N K W
     @extract netc   : Wc=W
     @extract W      : H J
     @extract Wc     : Hc=H Jc=J
 
-    corr = cavity ? tanh(β * R) : 1.0
+    corr = cavity ? tanh(γ * y) : 1.0
     @inbounds for k = 1:K
 	Jck = Jc[k]
 	Jk = J[k]
 	Hk = H[k]
 	Hck = Hc[k]
-	if β ≥ 5
+	if γ ≥ 5
 	    for i = 1:N
 		δH[i] = sign(Hck[i]) - (2 * Jk[i] - 1)
 	    end
 	else
 	    for i = 1:N
-		δH[i] = (tanh(β * R * Hck[i]) - corr * (2 * Jk[i] - 1))
+		δH[i] = (tanh(γ * y * Hck[i]) - corr * (2 * Jk[i] - 1))
 	    end
 	end
-	add_cx_to_y!(γ, δH, Hk)
+	add_cx_to_y!(λ, δH, Hk)
 	old_Jk = old_J[k]
 	for i = 1:N
 	    old_Jki = Base.unsafe_getindex(old_Jk, i)
 	    new_Jki = Hk[i] > 0
 	    Base.unsafe_setindex!(Jk, new_Jki, i)
-	    Hck[i] += 2 * (new_Jki - old_Jki) / R
+	    Hck[i] += 2 * (new_Jki - old_Jki) / y
 	    Base.unsafe_setindex!(Jck, Hck[i] > 0, i)
 	end
     end
 end
 
 function kickboth_traced_cont!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2)
-    @extract params : N K R β γ
+    @extract params : N K y γ λ
     @extract net    : N K W
     @extract netc   : Wc=W
     @extract W      : H J
@@ -267,13 +267,13 @@ function kickboth_traced_cont!(net::Net, netc::Net, params::Params, δH::Vec, ol
 	    Wi = 2 * Jk[i] - 1
 	    δH[i] = Hck[i] - Wi
 	end
-	add_cx_to_y!(γ, δH, Hk)
+	add_cx_to_y!(λ, δH, Hk)
 	old_Jk = old_J[k]
 	for i = 1:N
 	    old_Jki = Base.unsafe_getindex(old_Jk, i)
 	    new_Jki = Hk[i] > 0
 	    Base.unsafe_setindex!(Jk, new_Jki, i)
-	    Hck[i] += 2 * (new_Jki - old_Jki) / R
+	    Hck[i] += 2 * (new_Jki - old_Jki) / y
 	    Base.unsafe_setindex!(Jck, Hck[i] > 0, i)
 	end
     end
@@ -327,16 +327,16 @@ function compute_dist(net1::Net, net2::Net)
     return sum([sum(j1 $ j2) for (j1,j2) in zip(J1,J2)])
 end
 
-function init_outfile(outfile::AbstractString, R::Int)
+function init_outfile(outfile::AbstractString, y::Int)
     !isempty(outfile) && isreadable(outfile) && error("outfile exists: $outfile")
     !isempty(outfile) && open(outfile, "w") do outf
-	println(outf, "#epoch err(Wc) err(best) | ", join(["err(W$i)" for i = 1:R], " "), " | γ β | ", join(["d(W$i)" for i = 1:R], " "))
+	println(outf, "#epoch err(Wc) err(best) | ", join(["err(W$i)" for i = 1:y], " "), " | λ γ | ", join(["d(W$i)" for i = 1:y], " "))
     end
 end
 
-function report(ep::Int, errc, minerrc, errs::Vector, minerrs::Vector, dist::Vector{Int}, η::Float64, γ::Float64, β::Float64, quiet::Bool, outfile::AbstractString)
+function report(ep::Int, errc, minerrc, errs::Vector, minerrs::Vector, dist::Vector{Int}, η::Float64, λ::Float64, γ::Float64, quiet::Bool, outfile::AbstractString)
     if !quiet
-	println("ep: $ep γ: $γ β: $β η: $η")
+	println("ep: $ep λ: $λ γ: $γ η: $η")
 	println("  errc: $minerrc [$errc]")
 	println("  errs: $(minimum(minerrs)) $errs (mean=$(mean(errs)))")
 	println("  dist = $dist (mean=$(mean(dist)))")
@@ -348,7 +348,7 @@ function report(ep::Int, errc, minerrc, errs::Vector, minerrs::Vector, dist::Vec
             for ek in errs
                 @printf(outf, " %i", ek)
             end
-            @printf(outf, " | %f %f |", γ, β)
+            @printf(outf, " | %f %f |", λ, γ)
 	    for dk in dist
 		@printf(outf, " %f", dk)
 	    end
@@ -368,16 +368,16 @@ function main(; N::Integer = 51,
                 outfile::AbstractString = "",
                 waitcenter::Bool = false,
                 τ::Integer = 5,
+                f_λ::Float64 = 1.0,
+                s_λ::Float64 = 1e-2,
                 f_γ::Float64 = 1.0,
-                s_γ::Float64 = 1e-2,
-                f_β::Float64 = 1.0,
-		βpolicy::Symbol = :additive,
+		γpolicy::Symbol = :additive,
                 ep_scope::Integer = 1,
                 η::Float64 = 2.0,
 		f_η::Float64 = 1.0,
-                γ::Float64 = 0.1,
-                β::Float64 = Inf,
-                R::Integer = 1,
+                λ::Float64 = 0.1,
+                γ::Float64 = Inf,
+                y::Integer = 1,
 		formula::Symbol = :tanh,
                 quiet::Bool = false,
                 dynamic::Bool = false)
@@ -385,24 +385,24 @@ function main(; N::Integer = 51,
     srand(seed)
 
     formula ∈ [:tanh, :cavity, :simpler] || thorw(ArgumentError("formula must be either :tanh, :cavity or :simpler, given : $formula"))
-    βpolicy ∈ [:multiplicative, :additive] || throw(ArgumentError("βpolicy must be either :multiplicative or :additive, given: $βpolicy"))
+    γpolicy ∈ [:multiplicative, :additive] || throw(ArgumentError("γpolicy must be either :multiplicative or :additive, given: $γpolicy"))
 
-    γ == 0 && waitcenter && warn("γ=$γ waitcenter=$waitcenter")
+    λ == 0 && waitcenter && warn("λ=$λ waitcenter=$waitcenter")
 
     patterns = Patterns(N, M)
 
-    params = Params(N, K, R, τ, η, γ, β)
+    params = Params(N, K, y, τ, η, λ, γ)
 
     seed_run ≠ 0 && srand(seed_run)
 
     netc = Net()
-    nets = [Net() for r = 1:R]
+    nets = [Net() for r = 1:y]
 
     if center || init_equal
 	reset_net!(netc, params)
     end
 
-    for r = 1:R
+    for r = 1:y
 	if init_equal
 	    nets[r] = deepcopy(netc)
 	else
@@ -422,21 +422,21 @@ function main(; N::Integer = 51,
 
     dist = [compute_dist(netc, net) for net in nets]
 
-    init_outfile(outfile, R)
-    report(0, errc, minerrc, errs, minerrs, dist, η, γ, β, quiet, outfile)
+    init_outfile(outfile, y)
+    report(0, errc, minerrc, errs, minerrs, dist, η, λ, γ, quiet, outfile)
 
     ep_increase = τ / M
     ep = 0.0
     δH = Array(Float64, N)
-    patt_perm = [randperm(M) for r = 1:R]
-    a0 = ones(Int, R)
+    patt_perm = [randperm(M) for r = 1:y]
+    a0 = ones(Int, y)
     ok = errc == 0 || (!waitcenter && any(x->x==0, errs))
-    γ0 = γ
-    dynamic && (γ = 0.0)
+    λ0 = λ
+    dynamic && (λ = 0.0)
 
     minerr = min(minerrc, minimum(minerrs))
     while !ok && (ep < max_epochs)
-	for r in randperm(R)
+	for r in randperm(y)
 	    net = nets[r]
 	    for k = 1:K
 		copy!(old_J[k], net.W.J[k])
@@ -449,34 +449,34 @@ function main(; N::Integer = 51,
 		elseif formula == :simpler
 		    kickboth_traced_cont!(net, netc, params, δH, old_J)
 		end
-	    elseif γ > 0
+	    elseif λ > 0
 		kickboth!(net, netc, params, δH)
 	    end
 	end
 	ep += ep_increase
 	if abs(ep - ep_scope * round(ep / ep_scope)) < ep_increase / 2
-	    if βpolicy == :multiplicative
-		β *= f_β
-	    elseif βpolicy == :additive
-		β += f_β
+	    if γpolicy == :multiplicative
+		γ *= f_γ
+	    elseif γpolicy == :additive
+		γ += f_γ
 	    end
 	    if dynamic
-		γ0 *= f_γ
-		δγ = s_γ * (γ0 - atanh(1 - 2 * mean(dist) / (N * K)))
-		γ += δγ
+		λ0 *= f_λ
+		δλ = s_λ * (λ0 - atanh(1 - 2 * mean(dist) / (N * K)))
+		λ += δλ
 	    else
-		γ *= f_γ
+		λ *= f_λ
 	    end
 	    η *= f_η
 	    params.η = η
+	    params.λ = λ
 	    params.γ = γ
-	    params.β = β
 	end
 	if abs(ep - round(ep)) < ep_increase / 2
 	    errc = compute_err(netc, patterns)
 	    minerrc = min(minerrc, errc)
 	    errc == 0 && (ok = true)
-	    for r = 1:R
+	    for r = 1:y
 		net = nets[r]
 		shuffle!(patt_perm[r])
 		a0[r] = 1
@@ -486,7 +486,7 @@ function main(; N::Integer = 51,
 		dist[r] = compute_dist(netc, net)
 	    end
 	    minerr = min(minerrc, minimum(minerrs))
-	    report(round(Int,ep), errc, minerrc, errs, minerrs, dist, η, γ, β, quiet, outfile)
+	    report(round(Int,ep), errc, minerrc, errs, minerrs, dist, η, λ, γ, quiet, outfile)
 	end
     end
 
