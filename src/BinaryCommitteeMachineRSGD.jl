@@ -216,7 +216,7 @@ function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
     end
 end
 
-function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2, cavity::Bool = false, ep = 0.0)
+function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2, cavity::Bool = false)
     @extract params : N K y γ λ
     @extract net    : N K W
     @extract netc   : Wc=W
@@ -445,7 +445,7 @@ function main(; N::Integer = 51,
 	    a0[r] += τ
 	    if !center
 		if formula == :tanh || formula == :cavity
-		    kickboth_traced!(net, netc, params, δH, old_J, formula == :cavity, ep)
+		    kickboth_traced!(net, netc, params, δH, old_J, formula == :cavity)
 		elseif formula == :simpler
 		    kickboth_traced_cont!(net, netc, params, δH, old_J)
 		end
