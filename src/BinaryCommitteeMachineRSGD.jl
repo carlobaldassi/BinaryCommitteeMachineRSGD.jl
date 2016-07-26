@@ -171,8 +171,6 @@ let wrongh = Int[], indh = Int[], sortedindh = Int[]
 	o = o_tr[μ]
 
 	n_h = (- o * hout + 1) ÷ 2
-	empty!(wrongh)
-	empty!(indh)
 	for k = 1:K
 	    h[k] * o > 0 && continue
 	    push!(wrongh, -o * h[k])
@@ -187,6 +185,9 @@ let wrongh = Int[], indh = Int[], sortedindh = Int[]
 	    ΔHtemp = o * (2. * p - 1.)
 	    add_cx_to_y!(η, ΔHtemp, ΔHk)
 	end
+	empty!(wrongh)
+	empty!(indh)
+	empty!(sortedindh)
     end
 end
 
