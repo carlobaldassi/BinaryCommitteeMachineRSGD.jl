@@ -61,11 +61,10 @@ type Weights
     K::Int64
     J::BVec2
     H::Vec2
-    maxH::Float64
-    function Weights(N::Int64, K::Int64, maxH::Float64 = typemax(Float64))
+    function Weights(N::Int64, K::Int64)
 	H = [1.0 * rand(-1:2.:1, N) for k = 1:K]
 	J = [H[k] .> 0 for k = 1:K]
-	return new(N, K, J, H, maxH)
+	return new(N, K, J, H)
     end
 end
 
