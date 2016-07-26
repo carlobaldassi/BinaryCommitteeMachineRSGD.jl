@@ -130,8 +130,7 @@ function update_net!(net::Net)
 	Jk = J[k]
 	add_cx_to_y!(1., ΔH[k], H[k])
 	for i = 1:N
-	    #Jk[i] = Hk[i] > 0
-	    Base.unsafe_setindex!(Jk, Hk[i] > 0, i)
+	    Jk[i] = Hk[i] > 0
 	end
     end
 end
@@ -209,10 +208,8 @@ function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
 	add_cx_to_y!(λ, δH, Hk)
 	add_cx_to_y!(-λ, δH, Hck)
 	for i = 1:N
-	    #Jk[i] = Hk[i] > 0
-	    #Jck[i] = Hck[i] > 0
-	    Base.unsafe_setindex!(Jk, Hk[i] > 0, i)
-	    Base.unsafe_setindex!(Jck, Hck[i] > 0, i)
+	    Jk[i] = Hk[i] > 0
+	    Jck[i] = Hck[i] > 0
 	end
     end
 end
@@ -242,11 +239,11 @@ function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::
 	add_cx_to_y!(λ, δH, Hk)
 	old_Jk = old_J[k]
 	for i = 1:N
-	    old_Jki = Base.unsafe_getindex(old_Jk, i)
+	    old_Jki = old_Jk[i]
 	    new_Jki = Hk[i] > 0
-	    Base.unsafe_setindex!(Jk, new_Jki, i)
+	    Jk[i] = new_Jki
 	    Hck[i] += 2 * (new_Jki - old_Jki) / y
-	    Base.unsafe_setindex!(Jck, Hck[i] > 0, i)
+	    Jck[i] = Hck[i] > 0
 	end
     end
 end
@@ -271,11 +268,11 @@ function kickboth_traced_cont!(net::Net, netc::Net, params::Params, δH::Vec, ol
 	add_cx_to_y!(λ, δH, Hk)
 	old_Jk = old_J[k]
 	for i = 1:N
-	    old_Jki = Base.unsafe_getindex(old_Jk, i)
+	    old_Jki = old_Jk[i]
 	    new_Jki = Hk[i] > 0
-	    Base.unsafe_setindex!(Jk, new_Jki, i)
+	    Jk[i] = new_Jki
 	    Hck[i] += 2 * (new_Jki - old_Jki) / y
-	    Base.unsafe_setindex!(Jck, Hck[i] > 0, i)
+	    Jck[i] = Hck[i] > 0
 	end
     end
 end
