@@ -214,14 +214,14 @@ function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
     end
 end
 
-function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2, cavity::Bool = false)
+function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2, corrected::Bool = false)
     @extract params : N K y γ λ
     @extract net    : N K W
     @extract netc   : Wc=W
     @extract W      : H J
     @extract Wc     : Hc=H Jc=J
 
-    corr = cavity ? tanh(γ * y) : 1.0
+    correction = corrected ? tanh(γ * y) : 1.0
     @inbounds for k = 1:K
 	Jck = Jc[k]
 	Jk = J[k]
@@ -233,7 +233,7 @@ function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::
 	    end
 	else
 	    for i = 1:N
-		δH[i] = (tanh(γ * y * Hck[i]) - corr * (2 * Jk[i] - 1))
+		δH[i] = (tanh(γ * y * Hck[i]) - correction * (2 * Jk[i] - 1))
 	    end
 	end
 	add_cx_to_y!(λ, δH, Hk)
@@ -248,7 +248,7 @@ function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::
     end
 end
 
-function kickboth_traced_cont!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2)
+function kickboth_traced_continuous!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2)
     @extract params : N K y γ λ
     @extract net    : N K W
     @extract netc   : Wc=W
@@ -357,30 +357,35 @@ end
 
 function main(; N::Integer = 51,
                 K::Integer = 1,
-                max_epochs::Real = 1_000,
                 M::Integer = 10,
-                center::Bool = false,
-                init_equal::Bool = true,
-                seed::Integer = 1,
-		seed_run::Integer = 0,
-                outfile::AbstractString = "",
-                waitcenter::Bool = false,
-                τ::Integer = 5,
+                y::Integer = 1,
+
+                η::Float64 = 2.0,
+                λ::Float64 = 0.1,
+                γ::Float64 = Inf,
+		f_η::Float64 = 1.0,
                 f_λ::Float64 = 1.0,
                 f_γ::Float64 = 1.0,
 		γpolicy::Symbol = :additive,
+                τ::Integer = 5,
+
                 ep_scope::Integer = 1,
-                η::Float64 = 2.0,
-		f_η::Float64 = 1.0,
-                λ::Float64 = 0.1,
-                γ::Float64 = Inf,
-                y::Integer = 1,
-		formula::Symbol = :tanh,
+		formula::Symbol = :simple,
+
+                seed::Integer = 1,
+		seed_run::Integer = 0,
+
+                max_epochs::Real = 1_000,
+                init_equal::Bool = true,
+                waitcenter::Bool = false,
+                center::Bool = false,
+
+                outfile::AbstractString = "",
 		quiet::Bool = false)
 
     srand(seed)
 
-    formula ∈ [:tanh, :cavity, :simpler] || thorw(ArgumentError("formula must be either :tanh, :cavity or :simpler, given : $formula"))
+    formula ∈ [:simple, :corrected, :continuous] || throw(ArgumentError("formula must be either :simple, :corrected or :continuous, given : $formula"))
     γpolicy ∈ [:multiplicative, :additive] || throw(ArgumentError("γpolicy must be either :multiplicative or :additive, given: $γpolicy"))
 
     λ == 0 && waitcenter && warn("λ=$λ waitcenter=$waitcenter")
@@ -438,10 +443,10 @@ function main(; N::Integer = 51,
 	    epoch!(net, patterns, patt_perm[r], a0[r], params)
 	    a0[r] += τ
 	    if !center
-		if formula == :tanh || formula == :cavity
-		    kickboth_traced!(net, netc, params, δH, old_J, formula == :cavity)
-		elseif formula == :simpler
-		    kickboth_traced_cont!(net, netc, params, δH, old_J)
+		if formula == :simple || formula == :corrected
+		    kickboth_traced!(net, netc, params, δH, old_J, formula == :corrected)
+		elseif formula == :continuous
+		    kickboth_traced_continuous!(net, netc, params, δH, old_J)
 		end
 	    elseif λ > 0
 		kickboth!(net, netc, params, δH)
