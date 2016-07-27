@@ -18,6 +18,7 @@ ok, epochs, minerr = replicatedSGD(Patterns(321, 401), K=5, y=7, batch=80, λ=0.
 @test ok
 
 outfile = tempname()
+isfile(outfile) && rm(outfile)
 try
     srand(1)
     ok, epochs, minerr = replicatedSGD(Patterns(321, 401), K=5, y=7, batch=80, λ=0.75, γ=0.05, γstep=0.001, formula=:hard, max_epochs=10_000,
