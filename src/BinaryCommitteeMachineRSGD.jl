@@ -59,12 +59,16 @@ end
 
 
 type Params
-    N::Int64
-    K::Int64
     y::Int64
     η::Float64
     λ::Float64
     γ::Float64
+end
+
+function update!(params::Params, ηfactor::Real, λfactor::Real, γstep::Real)
+    params.η *= ηfactor
+    params.λ *= λfactor
+    params.γ += γstep
 end
 
 type Net
@@ -91,6 +95,8 @@ type Net
 end
 
 reset_grads!(net::Net) = map!(x->fill!(x, 0.0), net.ΔH)
+
+Base.copy(net::Net) = Net(deepcopy(net.H))
 
 function mean_net(nets::Vector{Net})
     y = length(nets)
@@ -186,7 +192,7 @@ function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
 end
 
 function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2, corrected::Bool = false)
-    @extract params : N K y γ λ
+    @extract params : y γ λ
     @extract net    : N K H J
     @extract netc   : Hc=H Jc=J
 
@@ -218,7 +224,7 @@ function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::
 end
 
 function kickboth_traced_continuous!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2)
-    @extract params : N K y γ λ
+    @extract params : y γ λ
     @extract net    : N K H J
     @extract netc   : Hc=H Jc=J
 
@@ -350,7 +356,7 @@ function main(; N::Integer = 51,
 
     patterns = Patterns(N, M)
 
-    params = Params(N, K, y, η, λ, γ)
+    params = Params(y, η, λ, γ)
 
     seed_run ≠ 0 && srand(seed_run)
 
@@ -365,7 +371,7 @@ function main(; N::Integer = 51,
 
     for r = 1:y
         if init_equal
-            nets[r] = deepcopy(netc)
+            nets[r] = copy(netc)
         else
 	    nets[r] = Net(N, K)
         end
@@ -427,9 +433,7 @@ function main(; N::Integer = 51,
 	minerr = min(minerrc, minimum(minerrs))
 	report(ep, errc, minerrc, errs, minerrs, dist, params, quiet, outfile)
 
-	params.η *= ηfactor
-	params.λ *= λfactor
-	params.γ += γstep
+        update!(params, ηfactor, λfactor, γstep)
     end
 
     !quiet && println(ok ? "SOLVED" : "FAILED")
