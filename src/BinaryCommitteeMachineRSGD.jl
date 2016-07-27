@@ -67,76 +67,42 @@ type Params
     γ::Float64
 end
 
-type Grads
-    N::Int64
-    ΔH::Vec2
-    function Grads(N::Int64, K::Int64)
-        ΔH = [zeros(Float64, N) for k = 1:K]
-        return new(N, ΔH)
-    end
-end
-
-reset_grads!(Δ::Grads) = map!(x->fill!(x, 0.0), Δ.ΔH)
-
-type Weights
+type Net
     N::Int64
     K::Int64
     J::BVec2
     H::Vec2
-    function Weights(N::Int64, K::Int64)
-        H = [1.0 * rand(-1:2.:1, N) for k = 1:K]
-        J = [H[k] .> 0 for k = 1:K]
-        return new(N, K, J, H)
+    ΔH::Vec2
+    function Net(N, K)
+	H = [rand(-1:2.:1, N) for k = 1:K]
+	J = [H[k] .> 0 for k = 1:K]
+        ΔH = [zeros(Float64, N) for k = 1:K]
+	return new(N, K, J, H, ΔH)
+    end
+    function Net(H::Vec2)
+	K = length(H)
+	K ≥ 1 || throw(ArgumentError("empty initial vector H"))
+	N = length(H[1])
+	all(h->length(h)==N, H) || throw(ArgumentError("invalid initial vector H, lengths are not all equal: $(map(h->length(h), H))"))
+	J = [H[k] .> 0 for k = 1:K]
+	ΔH = [zeros(Float64, N) for k = 1:K]
+	return new(N, K, J, H, ΔH)
     end
 end
 
-type Net
-    N::Int64
-    K::Int64
-    W::Weights
-    Δ::Grads
-    function Net()
-        return new(0, 0, Weights(0,0), Grads(0,0))
-    end
-end
+reset_grads!(net::Net) = map!(x->fill!(x, 0.0), net.ΔH)
 
-reset_grads!(net::Net) = reset_grads!(net.Δ)
+function mean_net(nets::Vector{Net})
+    y = length(nets)
+    y ≥ 1 || throw(ArgumentError("empty nets vector"))
+    K = nets[1].K
+    all(net->net.K == K, nets) || throw(ArgumentError("heterogeneous nets: $(map(net->net.K, nets))"))
 
-function reset_net_mean!(netc::Net, nets::Vector{Net}, params::Params)
-    @extract params : N K y
-    W = Weights(N, K)
-    Δ = Grads(N, K)
-
-    for k = 1:K
-	#W.H[k] = sum([(2.0 * net.W.J[k] - 1) / y for net in nets])
-	W.H[k] = 2/y * sum([net.W.J[k] for net in nets]) .- 1
-        W.J[k] = W.H[k] .> 0
-    end
-
-    netc.N = N
-    netc.K = K
-    netc.W = W
-    netc.Δ = Δ
-    return netc
-end
-
-function reset_net!(net::Net, params::Params)
-    @extract params : N K
-    W = Weights(N, K)
-    Δ = Grads(N, K)
-
-    net.N = N
-    net.K = K
-    net.W = W
-    net.Δ = Δ
-
-    return net
+    Net([2/y * sum([net.J[k] for net in nets]) .- 1 for k = 1:K])
 end
 
 function update_net!(net::Net)
-    @extract net : N K W Δ
-    @extract W   : H J
-    @extract Δ   : ΔH
+    @extract net : N K H J ΔH
 
     @inbounds for k = 1:K
         Hk = H[k]
@@ -149,8 +115,7 @@ function update_net!(net::Net)
 end
 
 function forward_net!(netr, ξμ::BVec, h::IVec, τ::IVec)
-    @extract netr : N K W
-    @extract W    : J
+    @extract netr : N K J
     @inbounds for k = 1:K
         h[k] = dot_prod(ξμ, J[k], N)
         τ[k] = 2 * (h[k] > 0) - 1
@@ -173,9 +138,7 @@ forward_net(netr::Net, ξ::BVec2) = [forward_net(netr, ξμ) for ξμ in ξ]
 let wrongh = Int[], indh = Int[], sortedindh = Int[]
     global compute_gd!
     function compute_gd!(net::Net, patterns::Patterns, μ::Int64, h::IVec, τ::IVec, hout::Int64, params::Params)
-        @extract net      : N K W Δ
-        @extract W        : H
-        @extract Δ        : ΔH
+        @extract net      : N K H ΔH
 	@extract patterns : ξμ=ξ[μ] σμ=σ[μ]
         @extract params   : η
 
@@ -202,10 +165,8 @@ end
 
 function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
     @extract params : λ
-    @extract net    : N K W
-    @extract netc   : Wc=W
-    @extract W      : H J
-    @extract Wc     : Hc=H Jc=J
+    @extract net    : N K H J
+    @extract netc   : Hc=H Jc=J
 
     @inbounds for k = 1:K
         Jck = Jc[k]
@@ -226,10 +187,8 @@ end
 
 function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2, corrected::Bool = false)
     @extract params : N K y γ λ
-    @extract net    : N K W
-    @extract netc   : Wc=W
-    @extract W      : H J
-    @extract Wc     : Hc=H Jc=J
+    @extract net    : N K H J
+    @extract netc   : Hc=H Jc=J
 
     correction = corrected ? tanh(γ * y) : 1.0
     @inbounds for k = 1:K
@@ -260,10 +219,8 @@ end
 
 function kickboth_traced_continuous!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2)
     @extract params : N K y γ λ
-    @extract net    : N K W
-    @extract netc   : Wc=W
-    @extract W      : H J
-    @extract Wc     : Hc=H Jc=J
+    @extract net    : N K H J
+    @extract netc   : Hc=H Jc=J
 
     @inbounds for k = 1:K
         Jck = Jc[k]
@@ -322,10 +279,8 @@ function subepoch!(net::Net, patterns::Patterns, patt_perm::PatternsPermutation,
 end
 
 function compute_dist(net1::Net, net2::Net)
-    @extract net1 : N K W1=W
-    @extract net2 : W2=W
-    @extract W1   : J1=J
-    @extract W2   : J2=J
+    @extract net1 : J1=J
+    @extract net2 : J2=J
 
     return sum([sum(j1 $ j2) for (j1,j2) in zip(J1,J2)])
 end
@@ -399,24 +354,26 @@ function main(; N::Integer = 51,
 
     seed_run ≠ 0 && srand(seed_run)
 
-    netc = Net()
-    nets = [Net() for r = 1:y]
+    #netc = Net()
+    #nets = [Net() for r = 1:y]
+    local netc::Net
+    nets = Array(Net, y)
 
     if center || init_equal
-        reset_net!(netc, params)
+	netc = Net(N, K)
     end
 
     for r = 1:y
         if init_equal
             nets[r] = deepcopy(netc)
         else
-            reset_net!(nets[r], params)
+	    nets[r] = Net(N, K)
         end
     end
 
-    !center && reset_net_mean!(netc, nets, params)
+    !center && (netc = mean_net(nets))
 
-    old_J = deepcopy(netc.W.J)
+    old_J = deepcopy(netc.J)
 
     errc = compute_err(netc, patterns.ξ, patterns.σ)
     minerrc = errc
@@ -443,7 +400,7 @@ function main(; N::Integer = 51,
 	for subep = 1:sub_epochs, r in randperm(y)
 	    net = nets[r]
 	    for k = 1:K
-		copy!(old_J[k], net.W.J[k])
+		copy!(old_J[k], net.J[k])
 	    end
 	    subepoch!(net, patterns, patt_perm[r], params)
 	    if !center
