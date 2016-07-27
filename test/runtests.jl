@@ -1,4 +1,4 @@
-using BinaryCommitteeMachineRSGD.jl
+using BinaryCommitteeMachineRSGD
 using Base.Test
 
 # write your own tests here

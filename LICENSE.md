@@ -1,6 +1,6 @@
-The BinaryCommitteeMachineRSGD.jl.jl package is licensed under the MIT "Expat" License:
+The BinaryCommitteeMachineRSGD.jl package is licensed under the MIT "Expat" License:
 
-> Copyright (c) 2016: Carlo Baldassi, Alessanro Ingrosso.
+> Copyright (c) 2016: Carlo Baldassi, Alessandro Ingrosso.
 > 
 > Permission is hereby granted, free of charge, to any person obtaining a copy
 > of this software and associated documentation files (the "Software"), to deal
