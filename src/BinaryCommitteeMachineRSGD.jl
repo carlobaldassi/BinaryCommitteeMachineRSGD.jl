@@ -87,7 +87,7 @@ end
 
 
 type Params
-    y::Int64
+    y::Int
     η::Float64
     λ::Float64
     γ::Float64
@@ -100,8 +100,8 @@ function update!(params::Params, ηfactor::Real, λfactor::Real, γstep::Real)
 end
 
 type Net
-    N::Int64
-    K::Int64
+    N::Int
+    K::Int
     J::BVec2
     H::Vec2
     ΔH::Vec2
@@ -191,7 +191,7 @@ let wrongh = Int[], indh = Int[], sortedindh = Int[]
     end
 
     global compute_gd!
-    function compute_gd!(net::Net, patterns::Patterns, μ::Int64, h::IVec, hout::Int64, params::Params)
+    function compute_gd!(net::Net, patterns::Patterns, μ::Int, h::IVec, hout::Int, params::Params)
         @extract net      : N K H ΔH
 	@extract patterns : ξμ=ξ[μ] σμ=σ[μ]
         @extract params   : η
@@ -306,7 +306,7 @@ function compute_err(net::Net, ξ::BVec2, σ::IVec)
     return errs
 end
 
-function compute_err(net::Net, ξμ::BVec, σμ::Int64)
+function compute_err(net::Net, ξμ::BVec, σμ::Int)
     _, _, _, τout = forward_net(net, ξμ)
     return τout ≠ σμ
 end
