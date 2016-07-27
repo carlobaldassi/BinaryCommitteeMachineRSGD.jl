@@ -36,11 +36,32 @@ type Patterns
     end
 end
 
+type PatternsPermutation
+    M::Int
+    perm::IVec
+    a::Int
+    batch::Int
+    PatternsPermutation(M::Integer, batch::Integer) = new(M, randperm(M), 1, batch)
+end
+
+function get_batch(pp::PatternsPermutation)
+    @extract pp : M perm a batch
+
+    b = min(a + batch - 1, M)
+    if b == M
+	shuffle!(perm)
+	pp.a = 1
+    else
+	pp.a = b + 1
+    end
+    return a:b
+end
+
+
 type Params
     N::Int64
     K::Int64
     y::Int64
-    batch::Int64
     η::Float64
     λ::Float64
     γ::Float64
@@ -297,22 +318,18 @@ end
 
 compute_err(net::Net, patterns::Patterns) = compute_err(net, patterns.p_tr, patterns.o_tr)
 
-function epoch!(net::Net, patterns::Patterns, patt_perm::IVec, a0::Integer, params::Params)
-    @extract params   : batch
-    @extract patterns : M p_tr o_tr
+function subepoch!(net::Net, patterns::Patterns, patt_perm::PatternsPermutation, params::Params)
+    @extract patterns  : p_tr o_tr
+    @extract patt_perm : batch
 
     reset_grads!(net, params)
-    for a = a0:(a0+batch-1)
-        μ = patt_perm[mod1(a,M)]
-        p = p_tr[μ]
-        o = o_tr[μ]
+    for μ in get_batch(patt_perm)
+	p, o = p_tr[μ], o_tr[μ]
         h, t, hout, tout = forward_net(net, p)
         tout == o && continue
         compute_gd!(net, patterns, μ, h, t, hout, params)
     end
-
     update_net!(net)
-
     return
 end
 
@@ -332,7 +349,8 @@ function init_outfile(outfile::AbstractString, y::Int)
     end
 end
 
-function report(ep::Int, errc, minerrc, errs::Vector, minerrs::Vector, dist::Vector{Int}, η::Float64, λ::Float64, γ::Float64, quiet::Bool, outfile::AbstractString)
+function report(ep::Int, errc, minerrc, errs::Vector, minerrs::Vector, dist::Vector{Int}, params::Params, quiet::Bool, outfile::AbstractString)
+    @extract params : η λ γ
     if !quiet
         println("ep: $ep λ: $λ γ: $γ η: $η")
         println("  errc: $minerrc [$errc]")
@@ -368,7 +386,6 @@ function main(; N::Integer = 51,
                 γstep::Float64 = 1.0,
                 batch::Integer = 5,
 
-                ep_scope::Integer = 1,
                 formula::Symbol = :simple,
 
                 seed::Integer = 1,
@@ -390,7 +407,7 @@ function main(; N::Integer = 51,
 
     patterns = Patterns(N, M)
 
-    params = Params(N, K, y, batch, η, λ, γ)
+    params = Params(N, K, y, η, λ, γ)
 
     seed_run ≠ 0 && srand(seed_run)
 
@@ -422,64 +439,57 @@ function main(; N::Integer = 51,
     dist = [compute_dist(netc, net) for net in nets]
 
     init_outfile(outfile, y)
-    report(0, errc, minerrc, errs, minerrs, dist, η, λ, γ, quiet, outfile)
+    report(0, errc, minerrc, errs, minerrs, dist, params, quiet, outfile)
 
-    ep_increase = batch / M
-    ep = 0.0
+    sub_epochs = (M + batch - 1) ÷ batch
+    patt_perm = [PatternsPermutation(M, batch) for r = 1:y]
     δH = Array(Float64, N)
-    patt_perm = [randperm(M) for r = 1:y]
-    a0 = ones(Int, y)
-    ok = errc == 0 || (!waitcenter && any(x->x==0, errs))
 
     minerr = min(minerrc, minimum(minerrs))
+
+    ok = errc == 0 || (!waitcenter && minerr == 0)
+    ep = 0
+
     while !ok && (ep < max_epochs)
-        for r in randperm(y)
-            net = nets[r]
-            for k = 1:K
-                copy!(old_J[k], net.W.J[k])
-            end
-            epoch!(net, patterns, patt_perm[r], a0[r], params)
-            a0[r] += batch
-            if !center
-                if formula == :simple || formula == :corrected
-                    kickboth_traced!(net, netc, params, δH, old_J, formula == :corrected)
-                elseif formula == :continuous
-                    kickboth_traced_continuous!(net, netc, params, δH, old_J)
-                end
-            elseif λ > 0
-                kickboth!(net, netc, params, δH)
-            end
-        end
-        ep += ep_increase
-        if abs(ep - ep_scope * round(ep / ep_scope)) < ep_increase / 2
-            γ += γstep
-            λ *= λfactor
-            η *= ηfactor
-            params.η = η
-            params.λ = λ
-            params.γ = γ
-        end
-        if abs(ep - round(ep)) < ep_increase / 2
-            errc = compute_err(netc, patterns)
-            minerrc = min(minerrc, errc)
-            errc == 0 && (ok = true)
-            for r = 1:y
-                net = nets[r]
-                shuffle!(patt_perm[r])
-                a0[r] = 1
-                errs[r] = compute_err(net, patterns)
-                minerrs[r] = min(minerrs[r], errs[r])
-                errs[r] == 0 && !waitcenter && (ok = true)
-                dist[r] = compute_dist(netc, net)
-            end
-            minerr = min(minerrc, minimum(minerrs))
-            report(round(Int,ep), errc, minerrc, errs, minerrs, dist, η, λ, γ, quiet, outfile)
-        end
+	ep += 1
+	for subep = 1:sub_epochs, r in randperm(y)
+	    net = nets[r]
+	    for k = 1:K
+		copy!(old_J[k], net.W.J[k])
+	    end
+	    subepoch!(net, patterns, patt_perm[r], params)
+	    if !center
+		if formula == :simple || formula == :corrected
+		    kickboth_traced!(net, netc, params, δH, old_J, formula == :corrected)
+		elseif formula == :continuous
+		    kickboth_traced_continuous!(net, netc, params, δH, old_J)
+		end
+	    elseif params.λ > 0
+		kickboth!(net, netc, params, δH)
+	    end
+	end
+
+	errc = compute_err(netc, patterns)
+	minerrc = min(minerrc, errc)
+	errc == 0 && (ok = true)
+	for r = 1:y
+	    net = nets[r]
+	    errs[r] = compute_err(net, patterns)
+	    minerrs[r] = min(minerrs[r], errs[r])
+	    errs[r] == 0 && !waitcenter && (ok = true)
+	    dist[r] = compute_dist(netc, net)
+	end
+	minerr = min(minerrc, minimum(minerrs))
+	report(ep, errc, minerrc, errs, minerrs, dist, params, quiet, outfile)
+
+	params.η *= ηfactor
+	params.λ *= λfactor
+	params.γ += γstep
     end
 
     !quiet && println(ok ? "SOLVED" : "FAILED")
 
-    return ok, round(Int,ep), minerr
+    return ok, ep, minerr
 end
 
 end # module
