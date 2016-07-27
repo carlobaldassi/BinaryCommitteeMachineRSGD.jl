@@ -335,46 +335,54 @@ function report(ep::Int, errc::Int, minerrc::Int, errs::IVec, minerrs::IVec, dis
     end
 end
 
-function main(; N::Integer = 51,
-                K::Integer = 1,
-                M::Integer = 10,
-                y::Integer = 1,
-
-                η::Float64 = 2.0,
-                λ::Float64 = 0.1,
-                γ::Float64 = Inf,
-                ηfactor::Float64 = 1.0,
-                λfactor::Float64 = 1.0,
-                γstep::Float64 = 1.0,
-                batch::Integer = 5,
-
-                formula::Symbol = :simple,
-
-                seed::Integer = 1,
-                seed_run::Integer = 0,
-
-                max_epochs::Real = 1_000,
-                init_equal::Bool = true,
-                waitcenter::Bool = false,
-                center::Bool = false,
-
-                outfile::AbstractString = "",
-                quiet::Bool = false)
-
+function replicatedSGD(; N::Integer = 101, M::Integer = 10, seed::Integer = 1, kw...)
+    N ≥ 1 && isodd(N) || throw(ArgumentError("N must be positive and odd, given: $N"))
+    M ≥ 0 || throw(ArgumentError("M cannot be negative, given: $M"))
     srand(seed)
 
+    srand(seed)
+    patterns = Patterns(N, M)
+
+    replicatedSGD(patterns; kw...)
+end
+
+function replicatedSGD(patterns::Patterns;
+                       K::Integer = 1,
+                       y::Integer = 1,
+
+                       η::Float64 = 2.0,
+                       λ::Float64 = 0.1,
+                       γ::Float64 = Inf,
+                       ηfactor::Float64 = 1.0,
+                       λfactor::Float64 = 1.0,
+                       γstep::Float64 = 1.0,
+                       batch::Integer = 5,
+
+                       formula::Symbol = :simple,
+
+                       seed_run::Integer = 0,
+
+                       max_epochs::Real = 1_000,
+                       init_equal::Bool = true,
+                       waitcenter::Bool = false,
+                       center::Bool = false,
+
+                       outfile::AbstractString = "",
+                       quiet::Bool = false)
+
+    @extract patterns : N M
+    K ≥ 1 && isodd(K) || throw(ArgumentError("K must be positive and odd, given: $K"))
+    y ≥ 1 || throw(ArgumentError("y must be positive, given: $y"))
+    batch ≥ 1 || throw(ArgumentError("batch must be positive, given: $batch"))
     formula ∈ [:simple, :corrected, :continuous] || throw(ArgumentError("formula must be either :simple, :corrected or :continuous, given : $formula"))
+    max_epochs ≥ 0 || throw(ArgumentError("max_epochs cannot be negative, given: $max_epochs"))
 
     λ == 0 && waitcenter && warn("λ=$λ waitcenter=$waitcenter")
 
-    patterns = Patterns(N, M)
+    seed_run ≠ 0 && srand(seed_run)
 
     params = Params(y, η, λ, γ)
 
-    seed_run ≠ 0 && srand(seed_run)
-
-    #netc = Net()
-    #nets = [Net() for r = 1:y]
     local netc::Net
     nets = Array(Net, y)
 
@@ -399,6 +407,8 @@ function main(; N::Integer = 51,
     errs = [compute_err(net, patterns.ξ, patterns.σ) for net in nets]
     minerrs = copy(errs)
 
+    minerr = min(minerrc, minimum(minerrs))
+
     dist = [compute_dist(netc, net) for net in nets]
 
     init_outfile(outfile, y)
@@ -407,11 +417,8 @@ function main(; N::Integer = 51,
     sub_epochs = (M + batch - 1) ÷ batch
     patt_perm = [PatternsPermutation(M, batch) for r = 1:y]
 
-    minerr = min(minerrc, minimum(minerrs))
-
     ok = errc == 0 || (!waitcenter && minerr == 0)
     ep = 0
-
     while !ok && (ep < max_epochs)
 	ep += 1
 	for subep = 1:sub_epochs, r in randperm(y)
