@@ -298,13 +298,13 @@ function compute_dist(net1::Net, net2::Net)
 end
 
 function init_outfile(outfile::AbstractString, y::Int)
-    !isempty(outfile) && isreadable(outfile) && error("outfile exists: $outfile")
+    !isempty(outfile) && isfile(outfile) && error("outfile exists: $outfile")
     !isempty(outfile) && open(outfile, "w") do outf
         println(outf, "#epoch err(Wc) err(best) | ", join(["err(W$i)" for i = 1:y], " "), " | λ γ | ", join(["d(W$i)" for i = 1:y], " "))
     end
 end
 
-function report(ep::Int, errc, minerrc, errs::Vector, minerrs::Vector, dist::Vector{Int}, params::Params, quiet::Bool, outfile::AbstractString)
+function report(ep::Int, errc::Int, minerrc::Int, errs::IVec, minerrs::IVec, dist::IVec, params::Params, quiet::Bool, outfile::AbstractString)
     @extract params : η λ γ
     if !quiet
         println("ep: $ep λ: $λ γ: $γ η: $η")
