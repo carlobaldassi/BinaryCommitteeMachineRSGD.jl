@@ -77,11 +77,14 @@ type Net
     J::BVec2
     H::Vec2
     ΔH::Vec2
+    old_J::BVec2
+    δH::Vec
     function Net(N, K)
 	H = [rand(-1:2.:1, N) for k = 1:K]
 	J = [H[k] .> 0 for k = 1:K]
         ΔH = [zeros(Float64, N) for k = 1:K]
-	return new(N, K, J, H, ΔH)
+        old_J = [copy(Jk) for Jk in J]
+        return new(N, K, J, H, ΔH, old_J)
     end
     function Net(H::Vec2)
 	K = length(H)
@@ -90,11 +93,14 @@ type Net
 	all(h->length(h)==N, H) || throw(ArgumentError("invalid initial vector H, lengths are not all equal: $(map(h->length(h), H))"))
 	J = [H[k] .> 0 for k = 1:K]
 	ΔH = [zeros(Float64, N) for k = 1:K]
-	return new(N, K, J, H, ΔH)
+        old_J = [copy(Jk) for Jk in J]
+        return new(N, K, J, H, ΔH, old_J)
     end
 end
 
 reset_grads!(net::Net) = map!(x->fill!(x, 0.0), net.ΔH)
+save_J!(net::Net) = map(k->copy!(net.old_J[k], net.J[k]), 1:net.K)
+init_δH!(net::Net) = net.δH = Array(Float64, net.N)
 
 Base.copy(net::Net) = Net(deepcopy(net.H))
 
@@ -169,10 +175,10 @@ let wrongh = Int[], indh = Int[], sortedindh = Int[]
     end
 end
 
-function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
+function kickboth!(net::Net, netc::Net, params::Params)
     @extract params : λ
     @extract net    : N K H J
-    @extract netc   : Hc=H Jc=J
+    @extract netc   : Hc=H Jc=J δH
 
     @inbounds for k = 1:K
         Jck = Jc[k]
@@ -191,10 +197,10 @@ function kickboth!(net::Net, netc::Net, params::Params, δH::Vec)
     end
 end
 
-function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2, corrected::Bool = false)
+function kickboth_traced!(net::Net, netc::Net, params::Params, corrected::Bool = false)
     @extract params : y γ λ
-    @extract net    : N K H J
-    @extract netc   : Hc=H Jc=J
+    @extract net    : N K H J old_J
+    @extract netc   : Hc=H Jc=J δH
 
     correction = corrected ? tanh(γ * y) : 1.0
     @inbounds for k = 1:K
@@ -223,10 +229,10 @@ function kickboth_traced!(net::Net, netc::Net, params::Params, δH::Vec, old_J::
     end
 end
 
-function kickboth_traced_continuous!(net::Net, netc::Net, params::Params, δH::Vec, old_J::BVec2)
+function kickboth_traced_continuous!(net::Net, netc::Net, params::Params)
     @extract params : y γ λ
-    @extract net    : N K H J
-    @extract netc   : Hc=H Jc=J
+    @extract net    : N K H J old_J
+    @extract netc   : Hc=H Jc=J δH
 
     @inbounds for k = 1:K
         Jck = Jc[k]
@@ -378,8 +384,7 @@ function main(; N::Integer = 51,
     end
 
     !center && (netc = mean_net(nets))
-
-    old_J = deepcopy(netc.J)
+    init_δH!(netc)
 
     errc = compute_err(netc, patterns.ξ, patterns.σ)
     minerrc = errc
@@ -394,7 +399,6 @@ function main(; N::Integer = 51,
 
     sub_epochs = (M + batch - 1) ÷ batch
     patt_perm = [PatternsPermutation(M, batch) for r = 1:y]
-    δH = Array(Float64, N)
 
     minerr = min(minerrc, minimum(minerrs))
 
@@ -405,18 +409,16 @@ function main(; N::Integer = 51,
 	ep += 1
 	for subep = 1:sub_epochs, r in randperm(y)
 	    net = nets[r]
-	    for k = 1:K
-		copy!(old_J[k], net.J[k])
-	    end
+            save_J!(net)
 	    subepoch!(net, patterns, patt_perm[r], params)
 	    if !center
 		if formula == :simple || formula == :corrected
-		    kickboth_traced!(net, netc, params, δH, old_J, formula == :corrected)
+		    kickboth_traced!(net, netc, params, formula == :corrected)
 		elseif formula == :continuous
-		    kickboth_traced_continuous!(net, netc, params, δH, old_J)
+                    kickboth_traced_continuous!(net, netc, params)
 		end
 	    elseif params.λ > 0
-		kickboth!(net, netc, params, δH)
+                kickboth!(net, netc, params)
 	    end
 	end
 
