@@ -33,12 +33,24 @@ function add_cx_to_y!(c::Float64, x::Vec, y::Vec)
     return y
 end
 
+"""
+    Patterns(N, M)
+
+Generates `M` random ±1 patterns of length `N`.
+
+    Patterns(ξ, σ)
+
+Encapsulates the input patterns `ξ` and their associated desired outputs `σ` for use in
+[`replicatedSGD`](@ref). The inputs `ξ` must be given as a vector of vectors, while the outputs `σ`
+must be given as a vector. In both cases, they are converted to ±1 values using their sign (more precisely,
+using `x > 0 ? 1 : -1`).
+"""
 type Patterns
     N::Int
     M::Int
     ξ::BVec2
     σ::IVec
-    function Patterns(ξ::Vector, σ::Vector)
+    function Patterns{T<:AbstractVector}(ξ::AbstractVector{T}, σ::AbstractVector)
         M = length(ξ)
         length(σ) == M || throw(ArgumentError("inconsistent vector lengths: ξ=$M σ=$(length(σ))"))
         M ≥ 1 || throw(ArgumentError("empty patterns – use Patterns(N, 0) if this is what you intended"))
@@ -359,32 +371,83 @@ function report(ep::Int, errc::Int, minerrc::Int, errs::IVec, minerrs::IVec, dis
     end
 end
 
-function replicatedSGD(; N::Integer = 101, M::Integer = 10, seed::Integer = 1, kw...)
-    N ≥ 1 && isodd(N) || throw(ArgumentError("N must be positive and odd, given: $N"))
-    M ≥ 0 || throw(ArgumentError("M cannot be negative, given: $M"))
-    srand(seed)
+"""
+    replicatedSGD(patterns::Patterns; keywords...)
 
-    srand(seed)
-    patterns = Patterns(N, M)
+Runs the replicated Stochastic Gradient Descent algorithm over the given `patterns` (see [`Patterns`](@ref)). It
+automatically detects the size of the input and initializes a system of interacting binary committee machines which
+collectively try to learn the patterns.
 
-    replicatedSGD(patterns; kw...)
-end
+The function returns three values: a `Bool` with the success status, the number of epochs, and the minimum error achieved.
 
+The available keyword arguments (note that the defaults are mostly *not* sensible, they must be collectively tuned):
+
+* `K` (default=`1`): number of hidden units for each committee machine (size of the hidden layer)
+
+* `y` (default=`1`): number of replicas
+
+* `η` (default=`2`): initial value of the step for the energy (loss) term gradient
+
+* `λ` (default=`0.1`): initial value of the step for the interaction gradient (called `η′` in the paper)
+
+* `γ` (default=`Inf`): initial value of the interaction strength
+
+* `ηfactor` (default=`1`): factor used to update `η` after each epoch
+
+* `λfactor` (default=`1`): factor used to update `λ` after each epoch
+
+* `γstep` (default=`0.01`): additive step used to update `γ` after each epoch
+
+* `batch` (default=`5`): minibatch size
+
+* `formula` (default=`:simple`): used to choose the interaction update scheme when `center=false`; see below for available values
+
+* `seed` (default=`0`): random seed; if `0`, it is not used
+
+* `max_epochs` (default=`1000`): maximum number of epochs
+
+* `init_equal` (default=`true`): whether to initialize all replicated networks equally
+
+* `waitcenter` (default=`false`): whether to only exit successfully if the center replica has solved the problem
+
+* `center` (default=`false`): whether to explicity use a central replica (if `false`, it is traced out)
+
+* `outfile` (default=`""`): name of a file where to output the results; if empty it's ignored
+
+* `quiet` (default=`false`): whether to output information on screen
+
+The possible values of the `formula` option are:
+
+* `:simple` (the default): uses the simplest traced-out center formula (eq. (C7) in the paper)
+
+* `:corrected`: applies the correction of eq. (C9) to the formula of eq. (C7)
+
+* `:continuous`: version in which the center is continuous and traced-out
+
+* `:hard`: same as `:simple` but uses a hard tanh, for improved performance
+
+
+Example of a good parameter configuration (for a committee with `K=5` and `N*K=1605` synapses overall, working at `α=M/(NK)=0.5`):
+
+```julia
+ok, epochs, minerr = replicatedSGD(Patterns(321, 802), K=5, y=7, batch=80, λ=0.75, γ=0.05, γstep=0.001, formula=:simple)
+```
+"""
 function replicatedSGD(patterns::Patterns;
                        K::Integer = 1,
                        y::Integer = 1,
 
-                       η::Float64 = 2.0,
-                       λ::Float64 = 0.1,
-                       γ::Float64 = Inf,
-                       ηfactor::Float64 = 1.0,
-                       λfactor::Float64 = 1.0,
-                       γstep::Float64 = 1.0,
+                       η::Real = 2.0,
+                       λ::Real = 0.1,
+                       γ::Real = Inf,
+                       ηfactor::Real = 1.0,
+                       λfactor::Real = 1.0,
+                       γstep::Real = 0.01,
                        batch::Integer = 5,
 
                        formula::Symbol = :simple,
 
-                       seed_run::Integer = 0,
+                       seed::Integer = 0,
 
                        max_epochs::Real = 1_000,
                        init_equal::Bool = true,
@@ -406,8 +469,9 @@ function replicatedSGD(patterns::Patterns;
     max_epochs ≥ 0 || throw(ArgumentError("max_epochs cannot be negative, given: $max_epochs"))
 
     λ == 0 && waitcenter && warn("λ=$λ waitcenter=$waitcenter")
+    init_equal && batch ≥ M && warn("batch=$batch M=$M init_equal=$init_equal")
 
-    seed_run ≠ 0 && srand(seed_run)
+    seed ≠ 0 && srand(seed)
 
     params = Params(y, η, λ, γ)
 
@@ -484,5 +548,23 @@ function replicatedSGD(patterns::Patterns;
 
     return ok, ep, minerr
 end
+
+#"""
+#    replicatedSGD(; N=101, M=10, seed=1, keywords...)
+#
+#Generates a set of random patterns using the keyword arguments `N` and `M` and the given random `seed` (see [`Patterns`](@ref)),
+#then calls `replicatedSGD(::Patterns, keywords...)`
+#"""
+#function replicatedSGD(; N::Integer = 101, M::Integer = 10, seed::Integer = 1, kw...)
+#    N ≥ 1 && isodd(N) || throw(ArgumentError("N must be positive and odd, given: $N"))
+#    M ≥ 0 || throw(ArgumentError("M cannot be negative, given: $M"))
+#    srand(seed)
+#
+#    srand(seed)
+#    patterns = Patterns(N, M)
+#
+#    replicatedSGD(patterns; kw...)
+#end
+
 
 end # module
