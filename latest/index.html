@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Julia package BinaryCommitteeMachineRSGD.jl">
+        <meta name="author" content="Carlo Baldassi, Alessandro Ingrosso">
+        
+        <link rel="shortcut icon" href="./img/favicon.ico">
+
+	<title>BinaryCommitteeMachineRSGD.jl</title>
+
+        <link href="./css/bootstrap-custom.min.css" rel="stylesheet">
+        <link href="./css/font-awesome-4.0.3.css" rel="stylesheet">
+        <link rel="stylesheet" href="./css/highlight.css">
+        <link href="./css/base.css" rel="stylesheet">
+        <link href="./assets/Documenter.css" rel="stylesheet">
+
+        <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!--[if lt IE 9]>
+            <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+            <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+        <![endif]-->
+
+        
+    </head>
+
+    <body>
+
+        <div class="navbar navbar-default navbar-fixed-top" role="navigation">
+    <div class="container">
+
+        <!-- Collapsed navigation -->
+        <div class="navbar-header">
+            <!-- Expander button -->
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+
+            <!-- Main title -->
+            <a class="navbar-brand" href=".">BinaryCommitteeMachineRSGD.jl</a>
+        </div>
+
+        <!-- Expanded navigation -->
+        <div class="navbar-collapse collapse">
+            <!-- Main navigation -->
+            <ul class="nav navbar-nav">
+            
+            
+                <li class="active">
+                    <a href=".">Home</a>
+                </li>
+            
+            
+            </ul>
+
+            <!-- Search, Navigation and Repo links -->
+            <ul class="nav navbar-nav navbar-right">
+                <li>
+                    <a href="#" data-toggle="modal" data-target="#mkdocs_search_modal">
+                        <i class="fa fa-search"></i> Search
+                    </a>
+                </li>
+                <li class="disabled">
+                    <a rel="next" >
+                        <i class="fa fa-arrow-left"></i> Previous
+                    </a>
+                </li>
+                <li class="disabled">
+                    <a rel="prev" >
+                        Next <i class="fa fa-arrow-right"></i>
+                    </a>
+                </li>
+                
+                <li>
+                    <a href="https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl">
+                        
+                            <i class="fa fa-github"></i>
+                        
+                        GitHub
+                    </a>
+                </li>
+                
+            </ul>
+        </div>
+    </div>
+</div>
+
+        <div class="container">
+            <div class="col-md-3"><div class="bs-sidebar hidden-print affix well" role="complementary">
+    <ul class="nav bs-sidenav">
+    
+        <li class="main active"><a href="#binarycommitteemachinersgdjl-documentation">BinaryCommitteeMachineRSGD.jl documentation</a></li>
+        
+            <li><a href="#installation">Installation</a></li>
+        
+            <li><a href="#usage">Usage</a></li>
+        
+    
+    </ul>
+</div></div>
+            <div class="col-md-9" role="main">
+
+<p><a id='BinaryCommitteeMachineRSGD.jl-documentation-1'></a></p>
+<h1 id="binarycommitteemachinersgdjl-documentation">BinaryCommitteeMachineRSGD.jl documentation</h1>
+<p>This package implements the Replicated Stochastic Gradient Descent algorithm for committee machines with binary weights described in the paper <a href="http://arxiv.org/abs/1605.06444">Unreasonable Effectiveness of Learning Neural Nets: Accessible States and Robust Ensembles</a> by Carlo Baldassi, Christian Borgs, Jennifer Chayes, Alessandro Ingrosso, Carlo Lucibello, Luca Saglietti and Riccardo Zecchina.</p>
+<p>The package is tested against Julia <code>0.4</code> and <em>current</em> <code>0.5-dev</code> on Linux, OS X, and Windows.</p>
+<p><a id='Installation-1'></a></p>
+<h3 id="installation">Installation</h3>
+<p>To install the module, use this command from within Julia:</p>
+<pre><code>julia&gt; Pkg.clone(&quot;https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl&quot;)
+</code></pre>
+
+<p>Dependencies will be installed automatically.</p>
+<p><a id='Usage-1'></a></p>
+<h3 id="usage">Usage</h3>
+<p>The module is loaded as any other Julia module:</p>
+<pre><code>julia&gt; using BinaryCommitteeMachineRSGD
+</code></pre>
+
+<p>The code basically provides a single function which generates a system of interacting replicated committee machines and tries to learn some patterns. The function and the patterns constructor are documented below.</p>
+<p><a id='BinaryCommitteeMachineRSGD.Patterns' href='#BinaryCommitteeMachineRSGD.Patterns'>#</a>
+<strong><code>BinaryCommitteeMachineRSGD.Patterns</code></strong> &mdash; <em>Type</em>.</p>
+<pre><code>Patterns(N, M)
+</code></pre>
+
+<p>Generates <code>M</code> random ±1 patterns of length <code>N</code>.</p>
+<pre><code>Patterns(ξ, σ)
+</code></pre>
+
+<p>Encapsulates the input patterns <code>ξ</code> and their associated desired outputs <code>σ</code> for use in <a href=".#BinaryCommitteeMachineRSGD.replicatedSGD"><code>replicatedSGD</code></a>. The inputs <code>ξ</code> must be given as a vector of vectors, while the outputs <code>σ</code> must be given as a vector. In both cases, they are converted to ±1 values using their sign (more precisely, using <code>x &gt; 0 ? 1 : -1</code>).</p>
+<p><a id='BinaryCommitteeMachineRSGD.replicatedSGD' href='#BinaryCommitteeMachineRSGD.replicatedSGD'>#</a>
+<strong><code>BinaryCommitteeMachineRSGD.replicatedSGD</code></strong> &mdash; <em>Function</em>.</p>
+<pre><code>replicatedSGD(patterns::Patterns; keywords...)
+</code></pre>
+
+<p>Runs the replicated Stochastic Gradient Descent algorithm over the given <code>patterns</code> (see <a href=".#BinaryCommitteeMachineRSGD.Patterns"><code>Patterns</code></a>). It automatically detects the size of the input and initializes a system of interacting binary committee machines which collectively try to learn the patterns.</p>
+<p>The function returns three values: a <code>Bool</code> with the success status, the number of epochs, and the minimum error achieved.</p>
+<p>The available keyword arguments (note that the defaults are mostly <em>not</em> sensible, they must be collectively tuned):</p>
+<ul>
+<li>
+<p><code>K</code> (default=<code>1</code>): number of hidden units for each committee machine (size of the hidden layer)</p>
+</li>
+<li>
+<p><code>y</code> (default=<code>1</code>): number of replicas</p>
+</li>
+<li>
+<p><code>η</code> (default=<code>2</code>): initial value of the step for the energy (loss) term gradient</p>
+</li>
+<li>
+<p><code>λ</code> (default=<code>0.1</code>): initial value of the step for the interaction gradient (called <code>η′</code> in the paper)</p>
+</li>
+<li>
+<p><code>γ</code> (default=<code>Inf</code>): initial value of the interaction strength</p>
+</li>
+<li>
+<p><code>ηfactor</code> (default=<code>1</code>): factor used to update <code>η</code> after each epoch</p>
+</li>
+<li>
+<p><code>λfactor</code> (default=<code>1</code>): factor used to update <code>λ</code> after each epoch</p>
+</li>
+<li>
+<p><code>γstep</code> (default=<code>0.01</code>): additive step used to update <code>γ</code> after each epoch</p>
+</li>
+<li>
+<p><code>batch</code> (default=<code>5</code>): minibatch size</p>
+</li>
+<li>
+<p><code>formula</code> (default=<code>:simple</code>): used to choose the interaction update scheme when <code>center=false</code>; see below for available values</p>
+</li>
+<li>
+<p><code>seed</code> (default=<code>0</code>): random seed; if <code>0</code>, it is not used</p>
+</li>
+<li>
+<p><code>max_epochs</code> (default=<code>1000</code>): maximum number of epochs</p>
+</li>
+<li>
+<p><code>init_equal</code> (default=<code>true</code>): whether to initialize all replicated networks equally</p>
+</li>
+<li>
+<p><code>waitcenter</code> (default=<code>false</code>): whether to only exit successfully if the center replica has solved the problem</p>
+</li>
+<li>
+<p><code>center</code> (default=<code>false</code>): whether to explicity use a central replica (if <code>false</code>, it is traced out)</p>
+</li>
+<li>
+<p><code>outfile</code> (default=<code>""</code>): name of a file where to output the results; if empty it's ignored</p>
+</li>
+<li>
+<p><code>quiet</code> (default=<code>false</code>): whether to output information on screen</p>
+</li>
+</ul>
+<p>The possible values of the <code>formula</code> option are:</p>
+<ul>
+<li>
+<p><code>:simple</code> (the default): uses the simplest traced-out center formula (eq. (C7) in the paper)</p>
+</li>
+<li>
+<p><code>:corrected</code>: applies the correction of eq. (C9) to the formula of eq. (C7)</p>
+</li>
+<li>
+<p><code>:continuous</code>: version in which the center is continuous and traced-out</p>
+</li>
+<li>
+<p><code>:hard</code>: same as <code>:simple</code> but uses a hard tanh, for improved performance</p>
+</li>
+</ul>
+<p>Example of a good parameter configuration (for a committee with <code>K=5</code> and <code>N*K=1605</code> synapses overall, working at <code>α=M/(NK)=0.5</code>):</p>
+<pre><code class="julia">ok, epochs, minerr = replicatedSGD(Patterns(321, 802), K=5, y=7, batch=80, λ=0.75, γ=0.05, γstep=0.001, formula=:simple)
+</code></pre></div>
+        </div>
+
+        <footer class="col-md-12">
+            <hr>
+            
+            <center>Documentation built with <a href="http://www.mkdocs.org/">MkDocs</a>.</center>
+        </footer>
+
+        <script src="./js/jquery-1.10.2.min.js"></script>
+        <script src="./js/bootstrap-3.0.3.min.js"></script>
+        <script src="./js/highlight.pack.js"></script>
+        <script>var base_url = '.';</script>
+        <script data-main="./mkdocs/js/search.js" src="./mkdocs/js/require.js"></script>
+        <script src="./js/base.js"></script>
+        <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="./assets/mathjaxhelper.js"></script>
+
+        <div class="modal" id="mkdocs_search_modal" tabindex="-1" role="dialog" aria-labelledby="Search Modal" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                        <h4 class="modal-title" id="exampleModalLabel">Search</h4>
+                    </div>
+                    <div class="modal-body">
+                        <p>
+                            From here you can search these documents. Enter
+                            your search terms below.
+                        </p>
+                        <form role="form">
+                            <div class="form-group">
+                                <input type="text" class="form-control" placeholder="Search..." id="mkdocs-search-query">
+                            </div>
+                        </form>
+                        <div id="mkdocs-search-results"></div>
+                    </div>
+                    <div class="modal-footer">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
