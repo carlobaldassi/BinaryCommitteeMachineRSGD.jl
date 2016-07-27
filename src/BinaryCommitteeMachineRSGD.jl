@@ -40,7 +40,7 @@ type Params
     N::Int64
     K::Int64
     y::Int64
-    τ::Int64
+    batch::Int64
     η::Float64
     λ::Float64
     γ::Float64
@@ -298,11 +298,11 @@ end
 compute_err(net::Net, patterns::Patterns) = compute_err(net, patterns.p_tr, patterns.o_tr)
 
 function epoch!(net::Net, patterns::Patterns, patt_perm::IVec, a0::Integer, params::Params)
-    @extract params   : τ
+    @extract params   : batch
     @extract patterns : M p_tr o_tr
 
     reset_grads!(net, params)
-    for a = a0:(a0+τ-1)
+    for a = a0:(a0+batch-1)
 	μ = patt_perm[mod1(a,M)]
 	p = p_tr[μ]
 	o = o_tr[μ]
@@ -363,11 +363,10 @@ function main(; N::Integer = 51,
                 η::Float64 = 2.0,
                 λ::Float64 = 0.1,
                 γ::Float64 = Inf,
-		f_η::Float64 = 1.0,
-                f_λ::Float64 = 1.0,
-                f_γ::Float64 = 1.0,
-		γpolicy::Symbol = :additive,
-                τ::Integer = 5,
+		ηfactor::Float64 = 1.0,
+                λfactor::Float64 = 1.0,
+                γstep::Float64 = 1.0,
+                batch::Integer = 5,
 
                 ep_scope::Integer = 1,
 		formula::Symbol = :simple,
@@ -386,13 +385,12 @@ function main(; N::Integer = 51,
     srand(seed)
 
     formula ∈ [:simple, :corrected, :continuous] || throw(ArgumentError("formula must be either :simple, :corrected or :continuous, given : $formula"))
-    γpolicy ∈ [:multiplicative, :additive] || throw(ArgumentError("γpolicy must be either :multiplicative or :additive, given: $γpolicy"))
 
     λ == 0 && waitcenter && warn("λ=$λ waitcenter=$waitcenter")
 
     patterns = Patterns(N, M)
 
-    params = Params(N, K, y, τ, η, λ, γ)
+    params = Params(N, K, y, batch, η, λ, γ)
 
     seed_run ≠ 0 && srand(seed_run)
 
@@ -426,7 +424,7 @@ function main(; N::Integer = 51,
     init_outfile(outfile, y)
     report(0, errc, minerrc, errs, minerrs, dist, η, λ, γ, quiet, outfile)
 
-    ep_increase = τ / M
+    ep_increase = batch / M
     ep = 0.0
     δH = Array(Float64, N)
     patt_perm = [randperm(M) for r = 1:y]
@@ -441,7 +439,7 @@ function main(; N::Integer = 51,
 		copy!(old_J[k], net.W.J[k])
 	    end
 	    epoch!(net, patterns, patt_perm[r], a0[r], params)
-	    a0[r] += τ
+	    a0[r] += batch
 	    if !center
 		if formula == :simple || formula == :corrected
 		    kickboth_traced!(net, netc, params, δH, old_J, formula == :corrected)
@@ -454,13 +452,9 @@ function main(; N::Integer = 51,
 	end
 	ep += ep_increase
 	if abs(ep - ep_scope * round(ep / ep_scope)) < ep_increase / 2
-	    if γpolicy == :multiplicative
-		γ *= f_γ
-	    elseif γpolicy == :additive
-		γ += f_γ
-	    end
-	    λ *= f_λ
-	    η *= f_η
+	    γ += γstep
+	    λ *= λfactor
+	    η *= ηfactor
 	    params.η = η
 	    params.λ = λ
 	    params.γ = γ
