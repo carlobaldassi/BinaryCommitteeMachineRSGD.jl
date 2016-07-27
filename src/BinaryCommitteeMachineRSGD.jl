@@ -26,13 +26,6 @@ function pm1dot(a::BVec, b::BVec)
     return l
 end
 
-function add_cx_to_y!(c::Float64, x::Vec, y::Vec)
-    @inbounds @simd for i = 1:length(y)
-        y[i] += c * x[i]
-    end
-    return y
-end
-
 """
     Patterns(N, M)
 
@@ -152,7 +145,7 @@ function update_net!(net::Net)
     @inbounds for k = 1:K
         Hk = H[k]
         Jk = J[k]
-        add_cx_to_y!(1., ΔH[k], H[k])
+        LinAlg.axpy!(1., ΔH[k], H[k])
         for i = 1:N
             Jk[i] = Hk[i] > 0
         end
@@ -234,8 +227,8 @@ function kickboth!(net::Net, netc::Net, params::Params)
         end
         Hk = H[k]
         Hck = Hc[k]
-        add_cx_to_y!(λ, δH, Hk)
-        add_cx_to_y!(-λ, δH, Hck)
+        LinAlg.axpy!(λ, δH, Hk)
+        LinAlg.axpy!(-λ, δH, Hck)
         for i = 1:N
             Jk[i] = Hk[i] > 0
             Jck[i] = Hck[i] > 0
