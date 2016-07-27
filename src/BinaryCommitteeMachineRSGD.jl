@@ -1,5 +1,7 @@
 module BinaryCommitteeMachineRSGD
 
+export Patterns, Net, replicatedSGD
+
 using ExtractMacro
 
 typealias IVec Vector{Int}
@@ -36,7 +38,19 @@ type Patterns
     M::Int
     ξ::BVec2
     σ::IVec
+    function Patterns(ξ::Vector, σ::Vector)
+        M = length(ξ)
+        length(σ) == M || throw(ArgumentError("inconsistent vector lengths: ξ=$M σ=$(length(σ))"))
+        M ≥ 1 || throw(ArgumentError("empty patterns – use Patterns(N, 0) if this is what you intended"))
+        N = length(first(ξ))
+        all(ξμ->length(ξμ)==N, ξ) || throw(ArgumentError("patterns length must all be the same, found: $(unique(map(length, ξ)))"))
+        ξ = BVec[ξμ .> 0 for ξμ in ξ]
+        σ = Int[2 * (σμ > 0) - 1 for σμ in σ]
+        return new(N, M, ξ, σ)
+    end
     function Patterns(N::Integer, M::Integer)
+        N ≥ 1 && isodd(N) || throw(ArgumentError("N must be positive and odd, given: $N"))
+        M ≥ 0 || throw(ArgumentError("M cannot be negative, given: $M"))
         ξ = [bitrand(N) for μ = 1:M]
         σ = rand(-1:2:1, M)
         return new(N, M, ξ, σ)
