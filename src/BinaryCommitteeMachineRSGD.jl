@@ -169,30 +169,43 @@ end
 forward_net(netr::Net, ξ::BVec2) = [forward_net(netr, ξμ) for ξμ in ξ]
 
 let wrongh = Int[], indh = Int[], sortedindh = Int[]
+
+    # this is faster than using sortperm! since `tofix` is typically small.
+    # note that it destroys `wrongh`.
+    function getrank!(tofix::Int)
+        resize!(sortedindh, tofix)
+        i = 1
+        while i ≤ tofix
+            k = findmin(wrongh)[2]
+            sortedindh[i] = k
+            wrongh[k] = typemax(Int)
+            i += 1
+        end
+    end
+
     global compute_gd!
-    function compute_gd!(net::Net, patterns::Patterns, μ::Int64, h::IVec, τ::IVec, hout::Int64, params::Params)
+    function compute_gd!(net::Net, patterns::Patterns, μ::Int64, h::IVec, hout::Int64, params::Params)
         @extract net      : N K H ΔH
 	@extract patterns : ξμ=ξ[μ] σμ=σ[μ]
         @extract params   : η
 
-        n_h = (-σμ * hout + 1) ÷ 2
+        tofix = (-σμ * hout + 1) ÷ 2
         for k = 1:K
             h[k] * σμ > 0 && continue
             push!(wrongh, -σμ * h[k])
             push!(indh, k)
         end
-        resize!(sortedindh, length(wrongh))
-        sortperm!(sortedindh, wrongh)
+        getrank!(tofix)
 
-        for kk = 1:n_h
-            k = indh[sortedindh[kk]]
-            ΔHk = ΔH[k]
-            ΔHtemp = σμ * (2.0 * ξμ - 1.0)
-            add_cx_to_y!(η, ΔHtemp, ΔHk)
+        for k in sortedindh
+            ΔHk = ΔH[indh[k]]
+            @inbounds @simd for i = 1:N
+                ΔHk[i] += η * σμ * (2.0 * ξμ[i] - 1)
+            end
         end
         empty!(wrongh)
         empty!(indh)
-        empty!(sortedindh)
+        #empty!(sortedindh)
     end
 end
 
@@ -221,7 +234,7 @@ end
 function kickboth_traced!(net::Net, netc::Net, params::Params, corrected::Bool = false)
     @extract params : y γ λ
     @extract net    : N K H J old_J
-    @extract netc   : Hc=H Jc=J δH
+    @extract netc   : Hc=H Jc=J
 
     correction = corrected ? tanh(γ * y) : 1.0
     @inbounds for k = 1:K
@@ -229,16 +242,9 @@ function kickboth_traced!(net::Net, netc::Net, params::Params, corrected::Bool =
         Jk = J[k]
         Hk = H[k]
         Hck = Hc[k]
-        if γ ≥ 5
-            for i = 1:N
-                δH[i] = sign(Hck[i]) - (2 * Jk[i] - 1)
-            end
-        else
-            for i = 1:N
-                δH[i] = (tanh(γ * y * Hck[i]) - correction * (2 * Jk[i] - 1))
-            end
+        for i = 1:N
+            Hk[i] += λ * (tanh(γ * y * Hck[i]) - correction * (2 * Jk[i] - 1))
         end
-        add_cx_to_y!(λ, δH, Hk)
         old_Jk = old_J[k]
         for i = 1:N
             old_Jki = old_Jk[i]
@@ -253,7 +259,7 @@ end
 function kickboth_traced_continuous!(net::Net, netc::Net, params::Params)
     @extract params : y γ λ
     @extract net    : N K H J old_J
-    @extract netc   : Hc=H Jc=J δH
+    @extract netc   : Hc=H Jc=J
 
     @inbounds for k = 1:K
         Jck = Jc[k]
@@ -262,9 +268,8 @@ function kickboth_traced_continuous!(net::Net, netc::Net, params::Params)
         Hck = Hc[k]
         for i = 1:N
             Wi = 2 * Jk[i] - 1
-            δH[i] = Hck[i] - Wi
+            Hk[i] += λ * (Hck[i] - Wi)
         end
-        add_cx_to_y!(λ, δH, Hk)
         old_Jk = old_J[k]
         for i = 1:N
             old_Jki = old_Jk[i]
@@ -305,7 +310,7 @@ function subepoch!(net::Net, patterns::Patterns, patt_perm::PatternsPermutation,
 	ξμ, σμ = ξ[μ], σ[μ]
         h, τ, hout, τout = forward_net(net, ξμ)
         τout == σμ && continue
-        compute_gd!(net, patterns, μ, h, τ, hout, params)
+        compute_gd!(net, patterns, μ, h, hout, params)
     end
     update_net!(net)
     return
@@ -413,7 +418,7 @@ function replicatedSGD(patterns::Patterns;
     end
 
     !center && (netc = mean_net(nets))
-    init_δH!(netc)
+    center && init_δH!(netc)
 
     errc = compute_err(netc, patterns.ξ, patterns.σ)
     minerrc = errc
