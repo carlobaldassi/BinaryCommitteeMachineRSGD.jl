@@ -1,6 +1,6 @@
 # BinaryCommitteeMachineRSGD.jl documentation
 
-This package implements the Replicated Stochastig Gradient Descent algorithm for
+This package implements the Replicated Stochastic Gradient Descent algorithm for
 committee machines with binary weights described in the paper
 [Unreasonable Effectiveness of Learning Neural Nets: Accessible States and Robust Ensembles](http://arxiv.org/abs/1605.06444)
 by Carlo Baldassi, Christian Borgs, Jennifer Chayes, Alessandro Ingrosso, Carlo Lucibello, Luca Saglietti and Riccardo Zecchina.

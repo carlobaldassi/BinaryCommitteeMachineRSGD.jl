@@ -1,3 +1,5 @@
+# This file is a part of BinaryCommitteeMachineRSGD.jl. License is MIT: http://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl/LICENCE.md
+
 module BinaryCommitteeMachineRSGD
 
 export Patterns, Net, replicatedSGD
