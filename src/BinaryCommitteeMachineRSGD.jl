@@ -231,19 +231,24 @@ function kickboth!(net::Net, netc::Net, params::Params)
     end
 end
 
-function kickboth_traced!(net::Net, netc::Net, params::Params, corrected::Bool = false)
+hardtanh(x::Float64) = clamp(x, -1.0, 1.0)
+
+compute_kick(::Val, x) = tanh(x)
+compute_kick(::Val{:hard}, x) = hardtanh(x)
+
+function kickboth_traced!(net::Net, netc::Net, params::Params, func::Val)
     @extract params : y γ λ
     @extract net    : N K H J old_J
     @extract netc   : Hc=H Jc=J
 
-    correction = corrected ? tanh(γ * y) : 1.0
+    correction = func == Val{:corrected}() ? tanh(γ * y) : 1.0
     @inbounds for k = 1:K
-        Jck = Jc[k]
         Jk = J[k]
         Hk = H[k]
+        Jck = Jc[k]
         Hck = Hc[k]
         for i = 1:N
-            Hk[i] += λ * (tanh(γ * y * Hck[i]) - correction * (2 * Jk[i] - 1))
+            Hk[i] += λ * (compute_kick(func, γ * y * Hck[i]) - correction * (2 * Jk[i] - 1))
         end
         old_Jk = old_J[k]
         for i = 1:N
@@ -393,7 +398,11 @@ function replicatedSGD(patterns::Patterns;
     K ≥ 1 && isodd(K) || throw(ArgumentError("K must be positive and odd, given: $K"))
     y ≥ 1 || throw(ArgumentError("y must be positive, given: $y"))
     batch ≥ 1 || throw(ArgumentError("batch must be positive, given: $batch"))
-    formula ∈ [:simple, :corrected, :continuous] || throw(ArgumentError("formula must be either :simple, :corrected or :continuous, given : $formula"))
+
+    valid_formulas = [:simple, :hard, :corrected, :continuous]
+    formula ∈ valid_formulas || throw(ArgumentError("unknown formula $formula, must be one of: $(join(map(string, valid_formulas), ", ", " or "))"))
+    func = Val{formula}()
+
     max_epochs ≥ 0 || throw(ArgumentError("max_epochs cannot be negative, given: $max_epochs"))
 
     λ == 0 && waitcenter && warn("λ=$λ waitcenter=$waitcenter")
@@ -445,10 +454,10 @@ function replicatedSGD(patterns::Patterns;
             save_J!(net)
 	    subepoch!(net, patterns, patt_perm[r], params)
 	    if !center
-		if formula == :simple || formula == :corrected
-		    kickboth_traced!(net, netc, params, formula == :corrected)
-		elseif formula == :continuous
+		if formula == :continuous
                     kickboth_traced_continuous!(net, netc, params)
+                else
+                    kickboth_traced!(net, netc, params, func)
 		end
 	    elseif params.λ > 0
                 kickboth!(net, netc, params)
