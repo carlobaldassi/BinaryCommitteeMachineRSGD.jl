@@ -27,12 +27,12 @@ end
 type Patterns
     N::Int
     M::Int
-    p_tr::BVec2
-    o_tr::IVec
+    ξ::BVec2
+    σ::IVec
     function Patterns(N::Integer, M::Integer)
-        p_tr = [bitrand(N) for μ = 1:M]
-        o_tr = rand(-1:2:1, M)
-        return new(N, M, p_tr, o_tr)
+        ξ = [bitrand(N) for μ = 1:M]
+        σ = rand(-1:2:1, M)
+        return new(N, M, ξ, σ)
     end
 end
 
@@ -69,13 +69,14 @@ end
 
 type Grads
     N::Int64
-    K::Int64
     ΔH::Vec2
     function Grads(N::Int64, K::Int64)
         ΔH = [zeros(Float64, N) for k = 1:K]
-        return new(N, K, ΔH)
+        return new(N, ΔH)
     end
 end
+
+reset_grads!(Δ::Grads) = map!(x->fill!(x, 0.0), Δ.ΔH)
 
 type Weights
     N::Int64
@@ -99,14 +100,7 @@ type Net
     end
 end
 
-function reset_grads!(net::Net, params::Params)
-    @extract params : N K
-    @extract net    : Δ
-    @extract Δ      : ΔH
-    @inbounds for k = 1:K
-        fill!(ΔH[k], 0.0)
-    end
-end
+reset_grads!(net::Net) = reset_grads!(net.Δ)
 
 function reset_net_mean!(netc::Net, nets::Vector{Net}, params::Params)
     @extract params : N K y
@@ -114,10 +108,8 @@ function reset_net_mean!(netc::Net, nets::Vector{Net}, params::Params)
     Δ = Grads(N, K)
 
     for k = 1:K
-        W.H[k] = zeros(Float64, N)
-        for r = 1:y
-            add_cx_to_y!(1/y, 2. * nets[r].W.J[k] - 1, W.H[k])
-        end
+	#W.H[k] = sum([(2.0 * net.W.J[k] - 1) / y for net in nets])
+	W.H[k] = 2/y * sum([net.W.J[k] for net in nets]) .- 1
         W.J[k] = W.H[k] .> 0
     end
 
@@ -156,44 +148,41 @@ function update_net!(net::Net)
     end
 end
 
-function forward_net!(netr, p::BVec, h::IVec, t::IVec)
+function forward_net!(netr, ξμ::BVec, h::IVec, τ::IVec)
     @extract netr : N K W
     @extract W    : J
     @inbounds for k = 1:K
-        h[k] = dot_prod(p, J[k], N)
-        t[k] = 2 * (h[k] > 0) - 1
+        h[k] = dot_prod(ξμ, J[k], N)
+        τ[k] = 2 * (h[k] > 0) - 1
     end
-    hout = sum(t)
-    tout = 2 * (hout > 0) - 1
+    hout = sum(τ)
+    τout = 2 * (hout > 0) - 1
 
-    return hout, tout
+    return hout, τout
 end
 
-function forward_net(netr, p::BVec)
+function forward_net(netr, ξμ::BVec)
     h = Array(Int, netr.K)
-    t = Array(Int, netr.K)
-    hout, tout = forward_net!(netr, p, h, t)
-    return h, t, hout, tout
+    τ = Array(Int, netr.K)
+    hout, τout = forward_net!(netr, ξμ, h, τ)
+    return h, τ, hout, τout
 end
 
-forward_net(netr::Net, ps::BVec2) = [forward_net(netr, p) for p in ps]
+forward_net(netr::Net, ξ::BVec2) = [forward_net(netr, ξμ) for ξμ in ξ]
 
 let wrongh = Int[], indh = Int[], sortedindh = Int[]
     global compute_gd!
-    function compute_gd!(net::Net, patterns::Patterns, μ::Int64, h::IVec, t::IVec, hout::Int64, params::Params)
+    function compute_gd!(net::Net, patterns::Patterns, μ::Int64, h::IVec, τ::IVec, hout::Int64, params::Params)
         @extract net      : N K W Δ
         @extract W        : H
         @extract Δ        : ΔH
-        @extract patterns : p_tr o_tr
+	@extract patterns : ξμ=ξ[μ] σμ=σ[μ]
         @extract params   : η
 
-        p = p_tr[μ]
-        o = o_tr[μ]
-
-        n_h = (- o * hout + 1) ÷ 2
+        n_h = (-σμ * hout + 1) ÷ 2
         for k = 1:K
-            h[k] * o > 0 && continue
-            push!(wrongh, -o * h[k])
+            h[k] * σμ > 0 && continue
+            push!(wrongh, -σμ * h[k])
             push!(indh, k)
         end
         resize!(sortedindh, length(wrongh))
@@ -202,7 +191,7 @@ let wrongh = Int[], indh = Int[], sortedindh = Int[]
         for kk = 1:n_h
             k = indh[sortedindh[kk]]
             ΔHk = ΔH[k]
-            ΔHtemp = o * (2. * p - 1.)
+            ΔHtemp = σμ * (2.0 * ξμ - 1.0)
             add_cx_to_y!(η, ΔHtemp, ΔHk)
         end
         empty!(wrongh)
@@ -276,7 +265,6 @@ function kickboth_traced_continuous!(net::Net, netc::Net, params::Params, δH::V
     @extract W      : H J
     @extract Wc     : Hc=H Jc=J
 
-
     @inbounds for k = 1:K
         Jck = Jc[k]
         Jk = J[k]
@@ -298,36 +286,36 @@ function kickboth_traced_continuous!(net::Net, netc::Net, params::Params, δH::V
     end
 end
 
-function compute_err(net::Net, ps::BVec2, os::IVec)
+function compute_err(net::Net, ξ::BVec2, σ::IVec)
     @extract net : K
 
     h = Array(Int, K)
-    t = Array(Int, K)
+    τ = Array(Int, K)
     errs = 0
-    for (p, o) in zip(ps, os)
-        _, tout = forward_net!(net, p, h, t)
-        errs += tout ≠ o
+    for (ξμ, σμ) in zip(ξ, σ)
+        _, τout = forward_net!(net, ξμ, h, τ)
+        errs += τout ≠ σμ
     end
     return errs
 end
 
-function compute_err(net::Net, p::BVec, o::Int64)
-    _, _, _, tout = forward_net(net, p)
-    return tout ≠ o
+function compute_err(net::Net, ξμ::BVec, σμ::Int64)
+    _, _, _, τout = forward_net(net, ξμ)
+    return τout ≠ σμ
 end
 
-compute_err(net::Net, patterns::Patterns) = compute_err(net, patterns.p_tr, patterns.o_tr)
+compute_err(net::Net, patterns::Patterns) = compute_err(net, patterns.ξ, patterns.σ)
 
 function subepoch!(net::Net, patterns::Patterns, patt_perm::PatternsPermutation, params::Params)
-    @extract patterns  : p_tr o_tr
+    @extract patterns  : ξ σ
     @extract patt_perm : batch
 
-    reset_grads!(net, params)
+    reset_grads!(net)
     for μ in get_batch(patt_perm)
-	p, o = p_tr[μ], o_tr[μ]
-        h, t, hout, tout = forward_net(net, p)
-        tout == o && continue
-        compute_gd!(net, patterns, μ, h, t, hout, params)
+	ξμ, σμ = ξ[μ], σ[μ]
+        h, τ, hout, τout = forward_net(net, ξμ)
+        τout == σμ && continue
+        compute_gd!(net, patterns, μ, h, τ, hout, params)
     end
     update_net!(net)
     return
@@ -430,10 +418,10 @@ function main(; N::Integer = 51,
 
     old_J = deepcopy(netc.W.J)
 
-    errc = compute_err(netc, patterns.p_tr, patterns.o_tr)
+    errc = compute_err(netc, patterns.ξ, patterns.σ)
     minerrc = errc
 
-    errs = [compute_err(net, patterns.p_tr, patterns.o_tr) for net in nets]
+    errs = [compute_err(net, patterns.ξ, patterns.σ) for net in nets]
     minerrs = copy(errs)
 
     dist = [compute_dist(netc, net) for net in nets]
