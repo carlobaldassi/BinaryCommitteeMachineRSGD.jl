@@ -367,7 +367,6 @@ function main(; N::Integer = 51,
                 waitcenter::Bool = false,
                 τ::Integer = 5,
                 f_λ::Float64 = 1.0,
-                s_λ::Float64 = 1e-2,
                 f_γ::Float64 = 1.0,
 		γpolicy::Symbol = :additive,
                 ep_scope::Integer = 1,
@@ -377,8 +376,7 @@ function main(; N::Integer = 51,
                 γ::Float64 = Inf,
                 y::Integer = 1,
 		formula::Symbol = :tanh,
-                quiet::Bool = false,
-                dynamic::Bool = false)
+		quiet::Bool = false)
 
     srand(seed)
 
@@ -429,8 +427,6 @@ function main(; N::Integer = 51,
     patt_perm = [randperm(M) for r = 1:y]
     a0 = ones(Int, y)
     ok = errc == 0 || (!waitcenter && any(x->x==0, errs))
-    λ0 = λ
-    dynamic && (λ = 0.0)
 
     minerr = min(minerrc, minimum(minerrs))
     while !ok && (ep < max_epochs)
@@ -458,13 +454,7 @@ function main(; N::Integer = 51,
 	    elseif γpolicy == :additive
 		γ += f_γ
 	    end
-	    if dynamic
-		λ0 *= f_λ
-		δλ = s_λ * (λ0 - atanh(1 - 2 * mean(dist) / (N * K)))
-		λ += δλ
-	    else
-		λ *= f_λ
-	    end
+	    λ *= f_λ
 	    η *= f_η
 	    params.η = η
 	    params.λ = λ
