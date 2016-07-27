@@ -8,7 +8,14 @@ typealias BVec2 Vector{BVec}
 typealias Vec Vector{Float64}
 typealias Vec2 Vector{Vec}
 
-function dot_prod(a::BVec, b::BVec, l::Int64)
+# same as (2a-1) ⋅ (2b-1)
+# note: no length checks
+function pm1dot(a::BVec, b::BVec)
+    # one way to write it avoiding allocations:
+    # 4 * (a ⋅ b) - 2sum(a) - 2sum(b) + length(a)
+
+    # ugly but slightly faster (length(a)-2sum(a$b) without allocations):
+    l = length(a)
     ac = a.chunks
     bc = b.chunks
     @inbounds @simd for i = 1:length(ac)
@@ -129,7 +136,7 @@ end
 function forward_net!(netr, ξμ::BVec, h::IVec, τ::IVec)
     @extract netr : N K J
     @inbounds for k = 1:K
-        h[k] = dot_prod(ξμ, J[k], N)
+        h[k] = pm1dot(ξμ, J[k])
         τ[k] = 2 * (h[k] > 0) - 1
     end
     hout = sum(τ)
