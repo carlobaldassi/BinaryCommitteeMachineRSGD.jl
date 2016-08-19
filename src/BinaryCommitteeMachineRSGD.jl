@@ -82,7 +82,7 @@ function get_batch(pp::PatternsPermutation)
     else
 	pp.a = b + 1
     end
-    return a:b
+    return perm[a:b]
 end
 
 
