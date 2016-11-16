@@ -4,7 +4,7 @@ module BinaryCommitteeMachineRSGD
 
 export Patterns, Net, replicatedSGD
 
-using ExtractMacro
+using ExtractMacro, Compat
 
 typealias IVec Vector{Int}
 typealias BVec BitVector
@@ -18,12 +18,12 @@ function pm1dot(a::BVec, b::BVec)
     # one way to write it avoiding allocations:
     # 4 * (a ⋅ b) - 2sum(a) - 2sum(b) + length(a)
 
-    # ugly but slightly faster (length(a)-2sum(a$b) without allocations):
+    # ugly but slightly faster (length(a)-2sum(a⊻b) without allocations):
     l = length(a)
     ac = a.chunks
     bc = b.chunks
     @inbounds @simd for i = 1:length(ac)
-        l -= 2 * count_ones(ac[i] $ bc[i])
+        l -= 2 * count_ones(ac[i] ⊻ bc[i])
     end
     return l
 end
@@ -332,7 +332,7 @@ function compute_dist(net1::Net, net2::Net)
     @extract net1 : J1=J
     @extract net2 : J2=J
 
-    return sum([sum(j1 $ j2) for (j1,j2) in zip(J1,J2)])
+    return sum([sum(j1 ⊻ j2) for (j1,j2) in zip(J1,J2)])
 end
 
 function init_outfile(outfile::AbstractString, y::Int)
