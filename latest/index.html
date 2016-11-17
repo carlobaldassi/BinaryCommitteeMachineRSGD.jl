@@ -107,8 +107,8 @@
 
 <p><a id='BinaryCommitteeMachineRSGD.jl-documentation-1'></a></p>
 <h1 id="binarycommitteemachinersgdjl-documentation">BinaryCommitteeMachineRSGD.jl documentation</h1>
-<p>This package implements the Replicated Stochastic Gradient Descent algorithm for committee machines with binary weights described in the paper <a href="http://arxiv.org/abs/1605.06444">Unreasonable Effectiveness of Learning Neural Networks: From Accessible States and Robust Ensembles to Basic Algorithmic Schemes</a> by Carlo Baldassi, Christian Borgs, Jennifer Chayes, Alessandro Ingrosso, Carlo Lucibello, Luca Saglietti and Riccardo Zecchina.</p>
-<p>The package is tested against Julia <code>0.4</code> and <em>current</em> <code>0.5-dev</code> on Linux, OS X, and Windows.</p>
+<p>This package implements the Replicated Stochastic Gradient Descent algorithm for committee machines with binary weights described in the paper <em>Unreasonable Effectiveness of Learning Neural Networks: From Accessible States and Robust Ensembles to Basic Algorithmic Schemes</em> by Carlo Baldassi, Christian Borgs, Jennifer Chayes, Alessandro Ingrosso, Carlo Lucibello, Luca Saglietti and Riccardo Zecchina, Proc. Natl. Acad. Sci. U.S.A. (2016), <a href="http://dx.doi.org/10.1073/pnas.1608103113">doi:10.1073/pnas.1608103113</a>.</p>
+<p>The package is tested against Julia <code>0.4</code>, <code>0.5</code> and <em>current</em> <code>0.6-dev</code> on Linux, OS X, and Windows.</p>
 <p><a id='Installation-1'></a></p>
 <h3 id="installation">Installation</h3>
 <p>To install the module, use this command from within Julia:</p>
@@ -133,6 +133,7 @@
 </code></pre>
 
 <p>Encapsulates the input patterns <code>ξ</code> and their associated desired outputs <code>σ</code> for use in <a href=".#BinaryCommitteeMachineRSGD.replicatedSGD"><code>replicatedSGD</code></a>. The inputs <code>ξ</code> must be given as a vector of vectors, while the outputs <code>σ</code> must be given as a vector. In both cases, they are converted to ±1 values using their sign (more precisely, using <code>x &gt; 0 ? 1 : -1</code>).</p>
+<p><a target='_blank' href='https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl/tree/db405f565c32d0f56cb5354472c1690e24809f47/src/BinaryCommitteeMachineRSGD.jl#L31-L42' class='documenter-source'>source</a><br></p>
 <p><a id='BinaryCommitteeMachineRSGD.replicatedSGD' href='#BinaryCommitteeMachineRSGD.replicatedSGD'>#</a>
 <strong><code>BinaryCommitteeMachineRSGD.replicatedSGD</code></strong> &mdash; <em>Function</em>.</p>
 <pre><code>replicatedSGD(patterns::Patterns; keywords...)
@@ -142,76 +143,36 @@
 <p>The function returns three values: a <code>Bool</code> with the success status, the number of epochs, and the minimum error achieved.</p>
 <p>The available keyword arguments (note that the defaults are mostly <em>not</em> sensible, they must be collectively tuned):</p>
 <ul>
-<li>
-<p><code>K</code> (default=<code>1</code>): number of hidden units for each committee machine (size of the hidden layer)</p>
-</li>
-<li>
-<p><code>y</code> (default=<code>1</code>): number of replicas</p>
-</li>
-<li>
-<p><code>η</code> (default=<code>2</code>): initial value of the step for the energy (loss) term gradient</p>
-</li>
-<li>
-<p><code>λ</code> (default=<code>0.1</code>): initial value of the step for the interaction gradient (called <code>η′</code> in the paper)</p>
-</li>
-<li>
-<p><code>γ</code> (default=<code>Inf</code>): initial value of the interaction strength</p>
-</li>
-<li>
-<p><code>ηfactor</code> (default=<code>1</code>): factor used to update <code>η</code> after each epoch</p>
-</li>
-<li>
-<p><code>λfactor</code> (default=<code>1</code>): factor used to update <code>λ</code> after each epoch</p>
-</li>
-<li>
-<p><code>γstep</code> (default=<code>0.01</code>): additive step used to update <code>γ</code> after each epoch</p>
-</li>
-<li>
-<p><code>batch</code> (default=<code>5</code>): minibatch size</p>
-</li>
-<li>
-<p><code>formula</code> (default=<code>:simple</code>): used to choose the interaction update scheme when <code>center=false</code>; see below for available values</p>
-</li>
-<li>
-<p><code>seed</code> (default=<code>0</code>): random seed; if <code>0</code>, it is not used</p>
-</li>
-<li>
-<p><code>max_epochs</code> (default=<code>1000</code>): maximum number of epochs</p>
-</li>
-<li>
-<p><code>init_equal</code> (default=<code>true</code>): whether to initialize all replicated networks equally</p>
-</li>
-<li>
-<p><code>waitcenter</code> (default=<code>false</code>): whether to only exit successfully if the center replica has solved the problem</p>
-</li>
-<li>
-<p><code>center</code> (default=<code>false</code>): whether to explicity use a central replica (if <code>false</code>, it is traced out)</p>
-</li>
-<li>
-<p><code>outfile</code> (default=<code>""</code>): name of a file where to output the results; if empty it's ignored</p>
-</li>
-<li>
-<p><code>quiet</code> (default=<code>false</code>): whether to output information on screen</p>
-</li>
+<li><code>K</code> (default=<code>1</code>): number of hidden units for each committee machine (size of the hidden layer)</li>
+<li><code>y</code> (default=<code>1</code>): number of replicas</li>
+<li><code>η</code> (default=<code>2</code>): initial value of the step for the energy (loss) term gradient</li>
+<li><code>λ</code> (default=<code>0.1</code>): initial value of the step for the interaction gradient (called <code>η′</code> in the paper)</li>
+<li><code>γ</code> (default=<code>Inf</code>): initial value of the interaction strength</li>
+<li><code>ηfactor</code> (default=<code>1</code>): factor used to update <code>η</code> after each epoch</li>
+<li><code>λfactor</code> (default=<code>1</code>): factor used to update <code>λ</code> after each epoch</li>
+<li><code>γstep</code> (default=<code>0.01</code>): additive step used to update <code>γ</code> after each epoch</li>
+<li><code>batch</code> (default=<code>5</code>): minibatch size</li>
+<li><code>formula</code> (default=<code>:simple</code>): used to choose the interaction update scheme when <code>center=false</code>; see below for available values</li>
+<li><code>seed</code> (default=<code>0</code>): random seed; if <code>0</code>, it is not used</li>
+<li><code>max_epochs</code> (default=<code>1000</code>): maximum number of epochs</li>
+<li><code>init_equal</code> (default=<code>true</code>): whether to initialize all replicated networks equally</li>
+<li><code>waitcenter</code> (default=<code>false</code>): whether to only exit successfully if the center replica has solved the problem</li>
+<li><code>center</code> (default=<code>false</code>): whether to explicity use a central replica (if <code>false</code>, it is traced out)</li>
+<li><code>outfile</code> (default=<code>""</code>): name of a file where to output the results; if empty it's ignored</li>
+<li><code>quiet</code> (default=<code>false</code>): whether to output information on screen</li>
 </ul>
 <p>The possible values of the <code>formula</code> option are:</p>
 <ul>
-<li>
-<p><code>:simple</code> (the default): uses the simplest traced-out center formula (eq. (C7) in the paper)</p>
-</li>
-<li>
-<p><code>:corrected</code>: applies the correction of eq. (C9) to the formula of eq. (C7)</p>
-</li>
-<li>
-<p><code>:continuous</code>: version in which the center is continuous and traced-out</p>
-</li>
-<li>
-<p><code>:hard</code>: same as <code>:simple</code> but uses a hard tanh, for improved performance</p>
-</li>
+<li><code>:simple</code> (the default): uses the simplest traced-out center formula (eq. (C7) in the paper)</li>
+<li><code>:corrected</code>: applies the correction of eq. (C9) to the formula of eq. (C7)</li>
+<li><code>:continuous</code>: version in which the center is continuous and traced-out</li>
+<li><code>:hard</code>: same as <code>:simple</code> but uses a hard tanh, for improved performance</li>
 </ul>
 <p>Example of a good parameter configuration (for a committee with <code>K=5</code> and <code>N*K=1605</code> synapses overall, working at <code>α=M/(NK)=0.5</code>):</p>
 <pre><code class="julia">ok, epochs, minerr = replicatedSGD(Patterns(321, 802), K=5, y=7, batch=80, λ=0.75, γ=0.05, γstep=0.001, formula=:simple)
-</code></pre></div>
+</code></pre>
+
+<p><a target='_blank' href='https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl/tree/db405f565c32d0f56cb5354472c1690e24809f47/src/BinaryCommitteeMachineRSGD.jl#L369-L430' class='documenter-source'>source</a><br></p></div>
         </div>
 
         <footer class="col-md-12">
