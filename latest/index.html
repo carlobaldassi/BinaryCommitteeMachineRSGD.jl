@@ -107,7 +107,7 @@
 
 <p><a id='BinaryCommitteeMachineRSGD.jl-documentation-1'></a></p>
 <h1 id="binarycommitteemachinersgdjl-documentation">BinaryCommitteeMachineRSGD.jl documentation</h1>
-<p>This package implements the Replicated Stochastic Gradient Descent algorithm for committee machines with binary weights described in the paper <em>Unreasonable Effectiveness of Learning Neural Networks: From Accessible States and Robust Ensembles to Basic Algorithmic Schemes</em> by Carlo Baldassi, Christian Borgs, Jennifer Chayes, Alessandro Ingrosso, Carlo Lucibello, Luca Saglietti and Riccardo Zecchina, Proc. Natl. Acad. Sci. U.S.A. (2016), <a href="http://dx.doi.org/10.1073/pnas.1608103113">doi:10.1073/pnas.1608103113</a>.</p>
+<p>This package implements the Replicated Stochastic Gradient Descent algorithm for committee machines with binary weights described in the paper <em>Unreasonable Effectiveness of Learning Neural Networks: From Accessible States and Robust Ensembles to Basic Algorithmic Schemes</em> by Carlo Baldassi, Christian Borgs, Jennifer Chayes, Alessandro Ingrosso, Carlo Lucibello, Luca Saglietti and Riccardo Zecchina, Proc. Natl. Acad. Sci. U.S.A. 113: E7655-E7662 (2016), <a href="http://dx.doi.org/10.1073/pnas.1608103113">doi:10.1073/pnas.1608103113</a>.</p>
 <p>The package is tested against Julia <code>0.4</code>, <code>0.5</code> and <em>current</em> <code>0.6-dev</code> on Linux, OS X, and Windows.</p>
 <p><a id='Installation-1'></a></p>
 <h3 id="installation">Installation</h3>
@@ -133,7 +133,7 @@
 </code></pre>
 
 <p>Encapsulates the input patterns <code>ξ</code> and their associated desired outputs <code>σ</code> for use in <a href=".#BinaryCommitteeMachineRSGD.replicatedSGD"><code>replicatedSGD</code></a>. The inputs <code>ξ</code> must be given as a vector of vectors, while the outputs <code>σ</code> must be given as a vector. In both cases, they are converted to ±1 values using their sign (more precisely, using <code>x &gt; 0 ? 1 : -1</code>).</p>
-<p><a target='_blank' href='https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl/tree/db405f565c32d0f56cb5354472c1690e24809f47/src/BinaryCommitteeMachineRSGD.jl#L31-L42' class='documenter-source'>source</a><br></p>
+<p><a target='_blank' href='https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl/tree/eed8307fbd3479d9ae9440dbd52f9a25d1e14969/src/BinaryCommitteeMachineRSGD.jl#L31-L42' class='documenter-source'>source</a><br></p>
 <p><a id='BinaryCommitteeMachineRSGD.replicatedSGD' href='#BinaryCommitteeMachineRSGD.replicatedSGD'>#</a>
 <strong><code>BinaryCommitteeMachineRSGD.replicatedSGD</code></strong> &mdash; <em>Function</em>.</p>
 <pre><code>replicatedSGD(patterns::Patterns; keywords...)
@@ -172,7 +172,7 @@
 <pre><code class="julia">ok, epochs, minerr = replicatedSGD(Patterns(321, 802), K=5, y=7, batch=80, λ=0.75, γ=0.05, γstep=0.001, formula=:simple)
 </code></pre>
 
-<p><a target='_blank' href='https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl/tree/db405f565c32d0f56cb5354472c1690e24809f47/src/BinaryCommitteeMachineRSGD.jl#L369-L430' class='documenter-source'>source</a><br></p></div>
+<p><a target='_blank' href='https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl/tree/eed8307fbd3479d9ae9440dbd52f9a25d1e14969/src/BinaryCommitteeMachineRSGD.jl#L369-L430' class='documenter-source'>source</a><br></p></div>
         </div>
 
         <footer class="col-md-12">
