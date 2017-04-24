@@ -6,11 +6,11 @@ export Patterns, Net, replicatedSGD
 
 using ExtractMacro, Compat
 
-typealias IVec Vector{Int}
-typealias BVec BitVector
-typealias BVec2 Vector{BVec}
-typealias Vec Vector{Float64}
-typealias Vec2 Vector{Vec}
+const IVec = Vector{Int}
+const BVec = BitVector
+const BVec2 = Vector{BVec}
+const Vec = Vector{Float64}
+const Vec2 = Vector{Vec}
 
 # same as (2a-1) ⋅ (2b-1)
 # note: no length checks
@@ -126,9 +126,9 @@ type Net
     end
 end
 
-reset_grads!(net::Net) = map!(x->fill!(x, 0.0), net.ΔH)
+reset_grads!(net::Net) = map!(x->fill!(x, 0.0), net.ΔH, net.ΔH)
 save_J!(net::Net) = map(k->copy!(net.old_J[k], net.J[k]), 1:net.K)
-init_δH!(net::Net) = net.δH = Array(Float64, net.N)
+init_δH!(net::Net) = net.δH = Array{Float64}(net.N)
 
 Base.copy(net::Net) = Net(deepcopy(net.H))
 
@@ -167,8 +167,8 @@ function forward_net!(netr, ξμ::BVec, h::IVec, τ::IVec)
 end
 
 function forward_net(netr, ξμ::BVec)
-    h = Array(Int, netr.K)
-    τ = Array(Int, netr.K)
+    h = Array{Int}(netr.K)
+    τ = Array{Int}(netr.K)
     hout, τout = forward_net!(netr, ξμ, h, τ)
     return h, τ, hout, τout
 end
@@ -296,8 +296,8 @@ end
 function compute_err(net::Net, ξ::BVec2, σ::IVec)
     @extract net : K
 
-    h = Array(Int, K)
-    τ = Array(Int, K)
+    h = Array{Int}(K)
+    τ = Array{Int}(K)
     errs = 0
     for (ξμ, σμ) in zip(ξ, σ)
         _, τout = forward_net!(net, ξμ, h, τ)
@@ -332,7 +332,8 @@ function compute_dist(net1::Net, net2::Net)
     @extract net1 : J1=J
     @extract net2 : J2=J
 
-    return sum([sum(j1 ⊻ j2) for (j1,j2) in zip(J1,J2)])
+    # TODO: change to .⊻ when 0.5 support is dropped
+    return @compat sum([sum(xor.(j1, j2)) for (j1,j2) in zip(J1,J2)])
 end
 
 function init_outfile(outfile::AbstractString, y::Int)
@@ -471,7 +472,7 @@ function replicatedSGD(patterns::Patterns;
     params = Params(y, η, λ, γ)
 
     local netc::Net
-    nets = Array(Net, y)
+    nets = Array{Net}(y)
 
     if center || init_equal
 	netc = Net(N, K)
