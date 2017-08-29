@@ -77,10 +77,10 @@ function get_batch(pp::PatternsPermutation)
 
     b = min(a + batch - 1, M)
     if b == M
-	shuffle!(perm)
-	pp.a = 1
+        shuffle!(perm)
+        pp.a = 1
     else
-	pp.a = b + 1
+        pp.a = b + 1
     end
     return perm[a:b]
 end
@@ -108,19 +108,19 @@ type Net
     old_J::BVec2
     δH::Vec
     function Net(N, K)
-	H = [rand(-1:2.:1, N) for k = 1:K]
-	J = [H[k] .> 0 for k = 1:K]
+        H = [rand(-1:2.:1, N) for k = 1:K]
+        J = [H[k] .> 0 for k = 1:K]
         ΔH = [zeros(Float64, N) for k = 1:K]
         old_J = [copy(Jk) for Jk in J]
         return new(N, K, J, H, ΔH, old_J)
     end
     function Net(H::Vec2)
-	K = length(H)
-	K ≥ 1 || throw(ArgumentError("empty initial vector H"))
-	N = length(H[1])
-	all(h->length(h)==N, H) || throw(ArgumentError("invalid initial vector H, lengths are not all equal: $(map(h->length(h), H))"))
-	J = [H[k] .> 0 for k = 1:K]
-	ΔH = [zeros(Float64, N) for k = 1:K]
+        K = length(H)
+        K ≥ 1 || throw(ArgumentError("empty initial vector H"))
+        N = length(H[1])
+        all(h->length(h)==N, H) || throw(ArgumentError("invalid initial vector H, lengths are not all equal: $(map(h->length(h), H))"))
+        J = [H[k] .> 0 for k = 1:K]
+        ΔH = [zeros(Float64, N) for k = 1:K]
         old_J = [copy(Jk) for Jk in J]
         return new(N, K, J, H, ΔH, old_J)
     end
@@ -193,7 +193,7 @@ let wrongh = Int[], indh = Int[], sortedindh = Int[]
     global compute_gd!
     function compute_gd!(net::Net, patterns::Patterns, μ::Int, h::IVec, hout::Int, params::Params)
         @extract net      : N K H ΔH
-	@extract patterns : ξμ=ξ[μ] σμ=σ[μ]
+        @extract patterns : ξμ=ξ[μ] σμ=σ[μ]
         @extract params   : η
 
         tofix = (-σμ * hout + 1) ÷ 2
@@ -319,7 +319,7 @@ function subepoch!(net::Net, patterns::Patterns, patt_perm::PatternsPermutation,
 
     reset_grads!(net)
     for μ in get_batch(patt_perm)
-	ξμ, σμ = ξ[μ], σ[μ]
+        ξμ, σμ = ξ[μ], σ[μ]
         h, τ, hout, τout = forward_net(net, ξμ)
         τout == σμ && continue
         compute_gd!(net, patterns, μ, h, hout, params)
@@ -475,14 +475,14 @@ function replicatedSGD(patterns::Patterns;
     nets = Array{Net}(y)
 
     if center || init_equal
-	netc = Net(N, K)
+        netc = Net(N, K)
     end
 
     for r = 1:y
         if init_equal
             nets[r] = copy(netc)
         else
-	    nets[r] = Net(N, K)
+            nets[r] = Net(N, K)
         end
     end
 
@@ -508,34 +508,34 @@ function replicatedSGD(patterns::Patterns;
     ok = errc == 0 || (!waitcenter && minerr == 0)
     ep = 0
     while !ok && (ep < max_epochs)
-	ep += 1
-	for subep = 1:sub_epochs, r in randperm(y)
-	    net = nets[r]
+        ep += 1
+        for subep = 1:sub_epochs, r in randperm(y)
+            net = nets[r]
             save_J!(net)
-	    subepoch!(net, patterns, patt_perm[r], params)
-	    if !center
-		if formula == :continuous
+            subepoch!(net, patterns, patt_perm[r], params)
+            if !center
+                if formula == :continuous
                     kickboth_traced_continuous!(net, netc, params)
                 else
                     kickboth_traced!(net, netc, params, func)
-		end
-	    elseif params.λ > 0
+                end
+            elseif params.λ > 0
                 kickboth!(net, netc, params)
-	    end
-	end
+            end
+        end
 
-	errc = compute_err(netc, patterns)
-	minerrc = min(minerrc, errc)
-	errc == 0 && (ok = true)
-	for r = 1:y
-	    net = nets[r]
-	    errs[r] = compute_err(net, patterns)
-	    minerrs[r] = min(minerrs[r], errs[r])
-	    errs[r] == 0 && !waitcenter && (ok = true)
-	    dist[r] = compute_dist(netc, net)
-	end
-	minerr = min(minerrc, minimum(minerrs))
-	report(ep, errc, minerrc, errs, minerrs, dist, params, quiet, outfile)
+        errc = compute_err(netc, patterns)
+        minerrc = min(minerrc, errc)
+        errc == 0 && (ok = true)
+        for r = 1:y
+            net = nets[r]
+            errs[r] = compute_err(net, patterns)
+            minerrs[r] = min(minerrs[r], errs[r])
+            errs[r] == 0 && !waitcenter && (ok = true)
+            dist[r] = compute_dist(netc, net)
+        end
+        minerr = min(minerrc, minimum(minerrs))
+        report(ep, errc, minerrc, errs, minerrs, dist, params, quiet, outfile)
 
         update!(params, ηfactor, λfactor, γstep)
     end
