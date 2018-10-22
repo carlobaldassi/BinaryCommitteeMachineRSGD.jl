@@ -8,13 +8,15 @@ by Carlo Baldassi, Christian Borgs, Jennifer Chayes, Alessandro Ingrosso,
 Carlo Lucibello, Luca Saglietti and Riccardo Zecchina,
 Proc. Natl. Acad. Sci. U.S.A. 113: E7655-E7662 (2016), [doi:10.1073/pnas.1608103113](http://dx.doi.org/10.1073/pnas.1608103113).
 
-The package is tested against Julia `0.4`, `0.5` and *current* `0.6-dev` on Linux, OS X, and Windows.
+The package requires Julia `0.7` or later.
 
 ### Installation
 
-To install the module, use this command from within Julia:
+To install the module, use these commands from within Julia:
 
 ```
+julia> using Pkg
+
 julia> Pkg.clone("https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl")
 ```
 

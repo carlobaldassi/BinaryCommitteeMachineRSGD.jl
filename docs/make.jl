@@ -1,10 +1,18 @@
 using Documenter, BinaryCommitteeMachineRSGD
 
-makedocs()
-
-deploydocs(
-    deps   = Deps.pip("pygments", "mkdocs", "mkdocs-bootswatch", "python-markdown-math"),
-    repo   = "github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl.git",
-    julia  = "0.5"
+makedocs(
+    modules  = [BinaryCommitteeMachineRSGD],
+    format   = :html,
+    sitename = "BinaryCommitteeMachineRSGD.jl",
+    pages    = [
+        "Home" => "index.md",
+    ]
 )
 
+deploydocs(
+    repo   = "github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl.git",
+    target = "build",
+    deps = nothing,
+    make = nothing,
+    julia  = "1.0"
+)
