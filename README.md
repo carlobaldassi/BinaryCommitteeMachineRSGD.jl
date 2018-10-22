@@ -14,13 +14,15 @@ Proc. Natl. Acad. Sci. U.S.A. 113: E7655-E7662 (2016), [doi:10.1073/pnas.1608103
 
 The code is written in [Julia](http://julialang.org).
 
-The package is tested against Julia `0.4`, `0.5`, `0.6` and *current* (at the time of writing) `0.7-DEV` on Linux, OS X, and Windows.
+The package requires Julia `0.7` or later.
 
 ### Installation
 
-To install the module, use this command from within Julia:
+To install the module, use these commands from within Julia:
 
 ```
+julia> using Pkg
+
 julia> Pkg.clone("https://github.com/carlobaldassi/BinaryCommitteeMachineRSGD.jl")
 ```
 

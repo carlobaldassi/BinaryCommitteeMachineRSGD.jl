@@ -4,7 +4,7 @@ module BinaryCommitteeMachineRSGD
 
 export Patterns, Net, replicatedSGD
 
-using ExtractMacro, Compat
+using ExtractMacro, Printf, Random, Statistics, LinearAlgebra
 
 const IVec = Vector{Int}
 const BVec = BitVector
@@ -40,12 +40,12 @@ Encapsulates the input patterns `ξ` and their associated desired outputs `σ` f
 must be given as a vector. In both cases, they are converted to ±1 values using their sign (more precisely,
 using `x > 0 ? 1 : -1`).
 """
-type Patterns
+struct Patterns
     N::Int
     M::Int
     ξ::BVec2
     σ::IVec
-    function Patterns{T<:AbstractVector}(ξ::AbstractVector{T}, σ::AbstractVector)
+    function Patterns(ξ::AbstractVector{<:AbstractVector}, σ::AbstractVector)
         M = length(ξ)
         length(σ) == M || throw(ArgumentError("inconsistent vector lengths: ξ=$M σ=$(length(σ))"))
         M ≥ 1 || throw(ArgumentError("empty patterns – use Patterns(N, 0) if this is what you intended"))
@@ -64,7 +64,7 @@ type Patterns
     end
 end
 
-type PatternsPermutation
+mutable struct PatternsPermutation
     M::Int
     perm::IVec
     a::Int
@@ -86,7 +86,7 @@ function get_batch(pp::PatternsPermutation)
 end
 
 
-type Params
+mutable struct Params
     y::Int
     η::Float64
     λ::Float64
@@ -99,7 +99,7 @@ function update!(params::Params, ηfactor::Real, λfactor::Real, γstep::Real)
     params.γ += γstep
 end
 
-type Net
+mutable struct Net
     N::Int
     K::Int
     J::BVec2
@@ -127,8 +127,8 @@ type Net
 end
 
 reset_grads!(net::Net) = map!(x->fill!(x, 0.0), net.ΔH, net.ΔH)
-save_J!(net::Net) = map(k->copy!(net.old_J[k], net.J[k]), 1:net.K)
-init_δH!(net::Net) = net.δH = Array{Float64}(net.N)
+save_J!(net::Net) = map(k->copyto!(net.old_J[k], net.J[k]), 1:net.K)
+init_δH!(net::Net) = net.δH = Array{Float64}(undef, net.N)
 
 Base.copy(net::Net) = Net(deepcopy(net.H))
 
@@ -147,7 +147,7 @@ function update_net!(net::Net)
     @inbounds for k = 1:K
         Hk = H[k]
         Jk = J[k]
-        LinAlg.axpy!(1., ΔH[k], H[k])
+        axpy!(1., ΔH[k], H[k])
         for i = 1:N
             Jk[i] = Hk[i] > 0
         end
@@ -167,8 +167,8 @@ function forward_net!(netr, ξμ::BVec, h::IVec, τ::IVec)
 end
 
 function forward_net(netr, ξμ::BVec)
-    h = Array{Int}(netr.K)
-    τ = Array{Int}(netr.K)
+    h = Array{Int}(undef, netr.K)
+    τ = Array{Int}(undef, netr.K)
     hout, τout = forward_net!(netr, ξμ, h, τ)
     return h, τ, hout, τout
 end
@@ -229,8 +229,8 @@ function kickboth!(net::Net, netc::Net, params::Params)
         end
         Hk = H[k]
         Hck = Hc[k]
-        LinAlg.axpy!(λ, δH, Hk)
-        LinAlg.axpy!(-λ, δH, Hck)
+        axpy!(λ, δH, Hk)
+        axpy!(-λ, δH, Hck)
         for i = 1:N
             Jk[i] = Hk[i] > 0
             Jck[i] = Hck[i] > 0
@@ -296,8 +296,8 @@ end
 function compute_err(net::Net, ξ::BVec2, σ::IVec)
     @extract net : K
 
-    h = Array{Int}(K)
-    τ = Array{Int}(K)
+    h = Array{Int}(undef, K)
+    τ = Array{Int}(undef, K)
     errs = 0
     for (ξμ, σμ) in zip(ξ, σ)
         _, τout = forward_net!(net, ξμ, h, τ)
@@ -332,8 +332,7 @@ function compute_dist(net1::Net, net2::Net)
     @extract net1 : J1=J
     @extract net2 : J2=J
 
-    # TODO: change to .⊻ when 0.5 support is dropped
-    return @compat sum([sum(xor.(j1, j2)) for (j1,j2) in zip(J1,J2)])
+    return sum([sum(j1 .⊻ j2) for (j1,j2) in zip(J1,J2)])
 end
 
 function init_outfile(outfile::AbstractString, y::Int)
@@ -467,12 +466,12 @@ function replicatedSGD(patterns::Patterns;
     λ == 0 && waitcenter && warn("λ=$λ waitcenter=$waitcenter")
     init_equal && batch ≥ M && warn("batch=$batch M=$M init_equal=$init_equal")
 
-    seed ≠ 0 && srand(seed)
+    seed ≠ 0 && Random.seed!(seed)
 
     params = Params(y, η, λ, γ)
 
     local netc::Net
-    nets = Array{Net}(y)
+    nets = Array{Net}(undef, y)
 
     if center || init_equal
         netc = Net(N, K)
@@ -554,9 +553,9 @@ end
 #function replicatedSGD(; N::Integer = 101, M::Integer = 10, seed::Integer = 1, kw...)
 #    N ≥ 1 && isodd(N) || throw(ArgumentError("N must be positive and odd, given: $N"))
 #    M ≥ 0 || throw(ArgumentError("M cannot be negative, given: $M"))
-#    srand(seed)
+#    Random.seed!(seed)
 #
-#    srand(seed)
+#    Random.seed!(seed)
 #    patterns = Patterns(N, M)
 #
 #    replicatedSGD(patterns; kw...)
